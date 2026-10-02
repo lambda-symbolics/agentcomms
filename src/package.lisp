@@ -234,4 +234,46 @@
    #:agent-kill-terminal
    #:agent-release-terminal
    #:agent-create-elicitation
-   #:agent-complete-elicitation))
+   #:agent-complete-elicitation
+   ;; Client role
+   #:*acp-client-implementation-name*
+   #:*acp-client-implementation-version*
+   #:acp-client
+   #:acp-client-connection
+   #:acp-client-protocol-version
+   #:acp-client-agent-capabilities
+   #:acp-client-agent-info
+   #:acp-client-auth-methods
+   #:acp-client-advertised-capabilities
+   #:acp-client-connect
+   #:client-implementation
+   #:client-capabilities
+   #:client-session-update
+   #:client-request-permission
+   #:client-read-text-file
+   #:client-write-text-file
+   #:client-create-terminal
+   #:client-terminal-output
+   #:client-wait-for-terminal-exit
+   #:client-kill-terminal
+   #:client-release-terminal
+   #:client-create-elicitation
+   #:client-elicitation-completed
+   #:client-extension-request
+   #:client-extension-notification
+   #:client-agent-capability-p
+   #:client-agent-request
+   #:client-agent-notify
+   #:client-initialize
+   #:client-authenticate
+   #:client-new-session
+   #:client-load-session
+   #:client-resume-session
+   #:client-close-session
+   #:client-prompt
+   #:client-cancel
+   #:client-set-mode
+   #:client-set-config-option
+   #:client-list-sessions
+   #:client-delete-session
+   #:client-logout))

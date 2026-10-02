@@ -15,7 +15,8 @@
                              (:file "channel")
                              (:file "connection")
                              (:file "schema")
-                             (:file "agent"))))
+                             (:file "agent")
+                             (:file "client"))))
   :in-order-to ((asdf:test-op (asdf:test-op #:agentcomms/tests))))
 
 (asdf:defsystem #:agentcomms/tests
@@ -29,6 +30,7 @@
                              (:file "connection-tests")
                              (:file "schema-tests")
                              (:file "agent-tests")
+                             (:file "client-tests")
                              (:file "tests"))))
   :perform (asdf:test-op (operation component)
              (declare (ignore operation component))
