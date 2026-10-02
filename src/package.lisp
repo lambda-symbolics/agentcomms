@@ -290,4 +290,9 @@
    #:acp-process-channel-stderr-text
    #:acp-process-channel-alive-p
    #:acp-process-channel-exit-code
-   #:acp-launch-agent))
+   #:acp-launch-agent
+   #:*acp-maximum-inbound-requests*
+   #:acp-connection-maximum-inbound-requests
+   #:acp-inbound-request-thread
+   #:acp-absolute-path-p
+   #:acp-validate-absolute-path))

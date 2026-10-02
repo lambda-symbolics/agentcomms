@@ -33,6 +33,7 @@
                              (:file "agent-tests")
                              (:file "client-tests")
                              (:file "stdio-tests")
+                             (:file "lifecycle-tests")
                              (:file "tests"))))
   :perform (asdf:test-op (operation component)
              (declare (ignore operation component))

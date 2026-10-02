@@ -54,8 +54,10 @@ agent's requests; call the CLIENT- functions below to drive the agent."))
     (acp-client acp-channel &key (:name string) (:log-function (or null function))
                 (:request-timeout (or null real)))
     acp-connection)
+
+
 (defun acp-client-connect (client channel &key (name "agentcomms client") log-function
-                                                (request-timeout *acp-default-request-timeout*))
+                                            (request-timeout *acp-default-request-timeout*))
   "Attach CLIENT to CHANNEL and return the running connection."
   (let ((connection (make-acp-connection :channel channel
                                          :peer client
@@ -66,6 +68,8 @@ agent's requests; call the CLIENT- functions below to drive the agent."))
     connection))
 
 (-> client--connection (acp-client) acp-connection)
+
+
 (defun client--connection (client)
   "Return CLIENT's connection or signal that it is not attached."
   (or (acp-client-connection client)
@@ -163,6 +167,8 @@ accepted form, the content object."))
          :message "This client does not implement session/request_permission."))
 
 (-> client--unadvertised (string) nil)
+
+
 (defun client--unadvertised (method)
   "Signal Method Not Found for an optional METHOD this client never advertised."
   (error 'acp-method-error
@@ -231,6 +237,8 @@ accepted form, the content object."))
 ;;;; -- Serving the Agent's Requests --
 
 (-> client--require-advertised (acp-client string string) null)
+
+
 (defun client--require-advertised (client path method)
   "Signal Method Not Found when this client never advertised capability PATH."
   (unless (acp-capability-enabled-p (acp-client-advertised-capabilities client) path)
@@ -238,6 +246,8 @@ accepted form, the content object."))
   nil)
 
 (-> client--exit-status-object ((or null integer) (or null string)) hash-table)
+
+
 (defun client--exit-status-object (exit-code signal)
   "Return a terminal exit status object with null for absent fields."
   (json-object "exitCode" (or exit-code (json-null-value))
@@ -277,14 +287,14 @@ accepted form, the content object."))
          (client--require-advertised client "fs.readTextFile" method)
          (json-object "content"
                       (client-read-text-file client (session-id)
-                                             (acp-field params "path" :type ':string :required-p t)
+                                             (acp-field params "path" :type ':absolute-path :required-p t)
                                              :line (acp-field params "line" :type ':integer)
                                              :limit (acp-field params "limit" :type ':integer)
                                              :params params)))
         (:fs-write-text-file
          (client--require-advertised client "fs.writeTextFile" method)
          (client-write-text-file client (session-id)
-                                 (acp-field params "path" :type ':string :required-p t)
+                                 (acp-field params "path" :type ':absolute-path :required-p t)
                                  (acp-field params "content" :type ':string :required-p t)
                                  params)
          (json-object))
@@ -300,7 +310,7 @@ accepted form, the content object."))
                          (acp-field params "command" :type ':string :required-p t)
                          :arguments arguments
                          :environment (acp-name-value-pairs (json-get params "env"))
-                         :cwd (acp-field params "cwd" :type ':string)
+                         :cwd (acp-field params "cwd" :type ':absolute-path)
                          :output-byte-limit (acp-field params "outputByteLimit" :type ':integer)
                          :params params))))
         (:terminal-output
@@ -343,6 +353,7 @@ accepted form, the content object."))
         (t
          (call-next-method))))))
 
+
 (defmethod peer-handle-notification ((client acp-client) connection method params)
   "Deliver session updates, elicitation completions, and extension notifications."
   (declare (ignore connection))
@@ -367,11 +378,15 @@ accepted form, the content object."))
 ;;;; -- Driving the Agent --
 
 (-> client-agent-capability-p (acp-client string) boolean)
+
+
 (defun client-agent-capability-p (client path)
   "Return whether the agent advertised the dotted capability PATH."
   (acp-capability-enabled-p (acp-client-agent-capabilities client) path))
 
 (-> client--require-agent-capability (acp-client string) null)
+
+
 (defun client--require-agent-capability (client path)
   "Signal ACP-CAPABILITY-ERROR unless the agent advertised PATH."
   (unless (client-agent-capability-p client path)
@@ -381,6 +396,8 @@ accepted form, the content object."))
   nil)
 
 (-> client--require-initialized (acp-client) null)
+
+
 (defun client--require-initialized (client)
   "Signal ACP-STATE-ERROR before initialize has completed."
   (unless (acp-client-protocol-version client)
@@ -388,6 +405,8 @@ accepted form, the content object."))
   nil)
 
 (-> client-agent-request (acp-client string t &key (:timeout (or null real))) t)
+
+
 (defun client-agent-request (client method params &key (timeout nil timeout-p))
   "Send request METHOD with PARAMS to the agent and return its result."
   (let ((connection (client--connection client)))
@@ -396,6 +415,8 @@ accepted form, the content object."))
         (connection-request connection method params))))
 
 (-> client-agent-notify (acp-client string t) null)
+
+
 (defun client-agent-notify (client method params)
   "Send notification METHOD with PARAMS to the agent."
   (connection-notify (client--connection client) method params))
@@ -403,8 +424,10 @@ accepted form, the content object."))
 (-> client-initialize
     (acp-client &key (:protocol-version integer) (:timeout (or null real)) (:meta t))
     hash-table)
+
+
 (defun client-initialize (client &key (protocol-version *acp-protocol-version*)
-                                      (timeout nil timeout-p) meta)
+                                   (timeout nil timeout-p) meta)
   "Negotiate the protocol with the agent and record its capabilities.
 
 Return the initialize result. Signal ACP-UNSUPPORTED-VERSION when the agent
@@ -437,6 +460,8 @@ selects a version this library cannot speak."
     result))
 
 (-> client-authenticate (acp-client string &key (:meta t)) hash-table)
+
+
 (defun client-authenticate (client method-id &key meta)
   "Run the agent-driven authentication METHOD-ID and return the result."
   (client--require-initialized client)
@@ -454,6 +479,8 @@ selects a version this library cannot speak."
     (string &key (:session-id (or null string)) (:mcp-servers list)
             (:additional-directories list) (:meta t))
     hash-table)
+
+
 (defun client--session-setup-params (cwd &key session-id mcp-servers additional-directories meta)
   "Return the shared parameters of the session setup methods."
   (json-object "sessionId" session-id
@@ -466,6 +493,8 @@ selects a version this library cannot speak."
 (-> client-new-session
     (acp-client string &key (:mcp-servers list) (:additional-directories list) (:meta t))
     (values string hash-table))
+
+
 (defun client-new-session (client cwd &key mcp-servers additional-directories meta)
   "Create a session rooted at absolute CWD; return its id and the whole result."
   (client--require-initialized client)
@@ -474,8 +503,8 @@ selects a version this library cannot speak."
   (let* ((result (client-agent-request client (acp-method-name ':session-new)
                                        (client--session-setup-params
                                         cwd :mcp-servers mcp-servers
-                                            :additional-directories additional-directories
-                                            :meta meta)))
+                                        :additional-directories additional-directories
+                                        :meta meta)))
          (session-id (json-get result "sessionId")))
     (unless (stringp session-id)
       (error 'acp-protocol-error
@@ -486,6 +515,8 @@ selects a version this library cannot speak."
 (-> client-load-session
     (acp-client string string &key (:mcp-servers list) (:additional-directories list) (:meta t))
     hash-table)
+
+
 (defun client-load-session (client session-id cwd &key mcp-servers additional-directories meta)
   "Load SESSION-ID, receiving its history as session updates, and return the result."
   (client--require-initialized client)
@@ -493,11 +524,13 @@ selects a version this library cannot speak."
   (client-agent-request client (acp-method-name ':session-load)
                         (client--session-setup-params
                          cwd :session-id session-id :mcp-servers mcp-servers
-                             :additional-directories additional-directories :meta meta)))
+                         :additional-directories additional-directories :meta meta)))
 
 (-> client-resume-session
     (acp-client string string &key (:mcp-servers list) (:additional-directories list) (:meta t))
     hash-table)
+
+
 (defun client-resume-session (client session-id cwd &key mcp-servers additional-directories meta)
   "Resume SESSION-ID without history replay and return the result."
   (client--require-initialized client)
@@ -505,9 +538,11 @@ selects a version this library cannot speak."
   (client-agent-request client (acp-method-name ':session-resume)
                         (client--session-setup-params
                          cwd :session-id session-id :mcp-servers mcp-servers
-                             :additional-directories additional-directories :meta meta)))
+                         :additional-directories additional-directories :meta meta)))
 
 (-> client-close-session (acp-client string &key (:meta t)) hash-table)
+
+
 (defun client-close-session (client session-id &key meta)
   "Close the active SESSION-ID."
   (client--require-initialized client)
@@ -518,6 +553,8 @@ selects a version this library cannot speak."
 (-> client-prompt
     (acp-client string list &key (:timeout (or null real)) (:meta t))
     (values keyword hash-table))
+
+
 (defun client-prompt (client session-id prompt &key (timeout nil timeout-p) meta)
   "Send the content blocks PROMPT to SESSION-ID and wait for the turn to end.
 
@@ -535,12 +572,16 @@ value, and the whole result."
             result)))
 
 (-> client-cancel (acp-client string &key (:meta t)) null)
+
+
 (defun client-cancel (client session-id &key meta)
   "Ask the agent to cancel SESSION-ID's prompt turn."
   (client-agent-notify client (acp-method-name ':session-cancel)
                        (json-object "sessionId" session-id "_meta" meta)))
 
 (-> client-set-mode (acp-client string string &key (:meta t)) hash-table)
+
+
 (defun client-set-mode (client session-id mode-id &key meta)
   "Switch SESSION-ID to MODE-ID."
   (client--require-initialized client)
@@ -548,6 +589,8 @@ value, and the whole result."
                         (json-object "sessionId" session-id "modeId" mode-id "_meta" meta)))
 
 (-> client-set-config-option (acp-client string string t &key (:meta t)) list)
+
+
 (defun client-set-config-option (client session-id config-id value &key meta)
   "Set CONFIG-ID of SESSION-ID to VALUE, a string or a boolean; return all options."
   (client--require-initialized client)
@@ -563,6 +606,8 @@ value, and the whole result."
 (-> client-list-sessions
     (acp-client &key (:cwd (or null string)) (:cursor (or null string)) (:meta t))
     (values list (or null string)))
+
+
 (defun client-list-sessions (client &key cwd cursor meta)
   "List the agent's sessions, optionally filtered by CWD; return them and the next cursor."
   (client--require-initialized client)
@@ -574,6 +619,8 @@ value, and the whole result."
               (and (stringp next) next)))))
 
 (-> client-delete-session (acp-client string &key (:meta t)) hash-table)
+
+
 (defun client-delete-session (client session-id &key meta)
   "Delete SESSION-ID from the agent's session list."
   (client--require-initialized client)
@@ -582,6 +629,8 @@ value, and the whole result."
                         (json-object "sessionId" session-id "_meta" meta)))
 
 (-> client-logout (acp-client &key (:meta t)) hash-table)
+
+
 (defun client-logout (client &key meta)
   "End the agent's authenticated state."
   (client--require-initialized client)
