@@ -1,0 +1,25 @@
+#+title: agentcomms
+
+Agentcomms is a Common Lisp implementation of the Agent Client Protocol
+(ACP), the open protocol that editors such as Zed use to drive coding agents
+over newline-delimited JSON-RPC on standard I/O. The library speaks ACP
+protocol version 1 and leaves product decisions to the program that embeds
+it: an agent subclasses the agent peer and specializes a handful of generic
+functions; a client does the same on the client side.
+
+* Systems and package
+
+- ASDF system: =agentcomms=
+- Test system: =agentcomms/tests=
+- Package: =AGENTCOMMS=, nickname =ACP=
+
+Install the locked dependencies and run all tests:
+
+#+begin_src sh
+./script/bootstrap
+./script/check
+#+end_src
+
+* License
+
+COLL-Attribution, copyright 2026 Lambda Symbolics OÜ. See =LICENSE.lisp=.
