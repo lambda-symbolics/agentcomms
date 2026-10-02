@@ -82,21 +82,21 @@
       (error 'acp-protocol-error
              :message (format nil "~S is not a known ACP error code." name))))
 
-(-> acp-invalid-params (string &rest t) null)
+(-> acp-invalid-params (string &rest t) nil)
 (defun acp-invalid-params (control &rest arguments)
   "Signal an Invalid Params error describing the problem with CONTROL and ARGUMENTS."
   (error 'acp-method-error
          :code (acp-error-code ':invalid-params)
          :message (apply #'format nil control arguments)))
 
-(-> acp-authentication-required (&optional string) null)
+(-> acp-authentication-required (&optional string) nil)
 (defun acp-authentication-required (&optional (message "Authentication is required."))
   "Signal the Authentication Required error with MESSAGE."
   (error 'acp-method-error
          :code (acp-error-code ':authentication-required)
          :message message))
 
-(-> acp-resource-not-found (string) null)
+(-> acp-resource-not-found (string) nil)
 (defun acp-resource-not-found (message)
   "Signal the Resource Not Found error with MESSAGE."
   (error 'acp-method-error

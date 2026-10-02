@@ -217,6 +217,7 @@ Return a second value naming the next page cursor when more sessions exist."))
   (declare (ignore params))
   (acp-invalid-params "~A is not an advertised authentication method." method-id))
 
+(-> agent--unimplemented (string) nil)
 (defun agent--unimplemented (method)
   "Signal that baseline METHOD lacks an implementation."
   (error 'acp-method-error
