@@ -13,7 +13,8 @@
                              (:file "conditions")
                              (:file "json")
                              (:file "channel")
-                             (:file "connection"))))
+                             (:file "connection")
+                             (:file "schema"))))
   :in-order-to ((asdf:test-op (asdf:test-op #:agentcomms/tests))))
 
 (asdf:defsystem #:agentcomms/tests
@@ -25,6 +26,7 @@
                 :components ((:file "test-support")
                              (:file "json-tests")
                              (:file "connection-tests")
+                             (:file "schema-tests")
                              (:file "tests"))))
   :perform (asdf:test-op (operation component)
              (declare (ignore operation component))
