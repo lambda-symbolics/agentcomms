@@ -51,4 +51,42 @@
    #:json-object-p
    #:json-sequence->list
    #:json-encode
-   #:json-decode))
+   #:json-decode
+   ;; Channels
+   #:acp-channel
+   #:channel-maximum-message-characters
+   #:channel-read-message
+   #:channel-write-message
+   #:channel-close
+   #:channel-open-p
+   #:acp-stream-channel
+   #:make-acp-stream-channel
+   #:acp-pipe-channel
+   #:make-acp-channel-pair
+   ;; Connections
+   #:*acp-default-request-timeout*
+   #:*acp-inbound-request*
+   #:acp-peer
+   #:peer-handle-request
+   #:peer-handle-notification
+   #:peer-connection-closed
+   #:acp-connection
+   #:make-acp-connection
+   #:acp-connection-channel
+   #:acp-connection-peer
+   #:acp-connection-name
+   #:acp-connection-request-timeout
+   #:acp-connection-log-function
+   #:acp-connection-close-reason
+   #:connection-open-p
+   #:connection-run
+   #:connection-request
+   #:connection-notify
+   #:connection-cancel-request
+   #:connection-close
+   #:acp-inbound-request
+   #:acp-inbound-request-identifier
+   #:acp-inbound-request-method
+   #:acp-inbound-request-cancelled-p
+   #:acp-request-cancelled-p
+   #:acp-check-cancelled))

@@ -11,7 +11,9 @@
                 :serial t
                 :components ((:file "package")
                              (:file "conditions")
-                             (:file "json"))))
+                             (:file "json")
+                             (:file "channel")
+                             (:file "connection"))))
   :in-order-to ((asdf:test-op (asdf:test-op #:agentcomms/tests))))
 
 (asdf:defsystem #:agentcomms/tests
@@ -22,6 +24,7 @@
                 :serial t
                 :components ((:file "test-support")
                              (:file "json-tests")
+                             (:file "connection-tests")
                              (:file "tests"))))
   :perform (asdf:test-op (operation component)
              (declare (ignore operation component))
