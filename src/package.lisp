@@ -276,4 +276,18 @@
    #:client-set-config-option
    #:client-list-sessions
    #:client-delete-session
-   #:client-logout))
+   #:client-logout
+   ;; Standard I/O and subprocesses
+   #:*acp-process-exit-seconds*
+   #:*acp-process-kill-seconds*
+   #:*acp-process-stderr-limit*
+   #:acp-standard-io-channel
+   #:acp-standard-error-log
+   #:acp-serve-standard-io
+   #:acp-process-channel
+   #:acp-process-channel-process
+   #:acp-process-channel-command
+   #:acp-process-channel-stderr-text
+   #:acp-process-channel-alive-p
+   #:acp-process-channel-exit-code
+   #:acp-launch-agent))
