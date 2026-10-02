@@ -1,11 +1,24 @@
 #+title: agentcomms
 
 Agentcomms is a Common Lisp implementation of the Agent Client Protocol
-(ACP), the open protocol that editors such as Zed use to drive coding agents
-over newline-delimited JSON-RPC on standard I/O. The library speaks ACP
-protocol version 1 and leaves product decisions to the program that embeds
-it: an agent subclasses the agent peer and specializes a handful of generic
-functions; a client does the same on the client side.
+(ACP), the open protocol that editors such as Zed, Neovim, Emacs, and
+JetBrains use to drive coding agents over newline-delimited JSON-RPC on
+standard I/O. The library speaks ACP protocol version 1, the stable
+revision; the v2 draft is not implemented yet. It leaves product decisions
+to the program that embeds it: an agent subclasses the agent peer and
+specializes a handful of generic functions, and a client does the same on
+its side.
+
+The library handles:
+
+- JSON-RPC 2.0 framing, request correlation, and bidirectional requests
+- threaded request handling so cancellation reaches a running prompt
+- =$/cancel_request=, =session/cancel=, and the cancelled stop reason
+- protocol version negotiation and capability gating on both sides
+- every ACP v1 method, notification, and object constructor
+- standard I/O channels for agents and a subprocess launcher for clients
+- an in-process channel pair for tests and embedded peers
+- bounded message sizes and bounded JSON documents
 
 * Systems and package
 
@@ -19,6 +32,168 @@ Install the locked dependencies and run all tests:
 ./script/bootstrap
 ./script/check
 #+end_src
+
+* Values
+
+Wire objects are ordinary JSON values: objects are =EQUAL= hash tables,
+arrays are vectors, JSON booleans are =(JSON-TRUE-VALUE)= and
+=(JSON-FALSE-VALUE)=, and null is =(JSON-NULL-VALUE)=. =JSON-OBJECT= builds
+an object from alternating keys and values and omits =NIL= values, so
+optional fields can be passed straight through. =JSON-GET= reads a field
+with a default, =JSON-SEQUENCE->LIST= turns an array into a list, and
+=ACP-FIELD= validates one field of a received object, signalling an Invalid
+Params error for the peer when the type is wrong.
+
+Enumerations map between keywords and wire strings:
+=(STOP-REASON-STRING :END-TURN)= is ="end_turn"= and
+=(TOOL-KIND-KEYWORD "read")= is =:READ=. The =-KEYWORD= functions take a
+=:DEFAULT= for values newer peers may send.
+
+Constructors named =ACP-= build every protocol object: content blocks
+(=ACP-TEXT-CONTENT=, =ACP-IMAGE-CONTENT=, =ACP-RESOURCE-LINK=,
+=ACP-EMBEDDED-RESOURCE=), tool calls (=ACP-TOOL-CALL=, =ACP-TOOL-CALL-UPDATE=,
+=ACP-DIFF-CONTENT=, =ACP-TERMINAL-CONTENT=), plans, permission options, modes,
+configuration options, MCP server configurations, capabilities, and the
+session updates (=ACP-UPDATE-AGENT-MESSAGE=, =ACP-UPDATE-TOOL-CALL=,
+=ACP-UPDATE-PLAN=, and the rest).
+
+* Writing an agent
+
+Subclass =ACP-AGENT=, specialize the generic functions you support, and
+serve standard I/O:
+
+#+begin_src lisp
+(defclass my-agent (acp:acp-agent) ())
+
+(defmethod acp:agent-implementation ((agent my-agent))
+  (acp:acp-implementation "my-agent" "1.0.0" :title "My Agent"))
+
+(defmethod acp:agent-capabilities ((agent my-agent))
+  (acp:acp-agent-capabilities :image t :mcp-http t))
+
+(defmethod acp:agent-new-session ((agent my-agent) &key cwd mcp-servers additional-directories params)
+  (declare (ignore mcp-servers additional-directories params))
+  (values (start-conversation cwd)
+          (acp:json-object "modes" (acp:acp-session-mode-state
+                                    "code" (list (acp:acp-session-mode "code" "Code"))))))
+
+(defmethod acp:agent-prompt ((agent my-agent) session-id prompt params)
+  (declare (ignore params))
+  (dolist (block prompt)
+    (acp:agent-check-cancelled agent session-id)
+    (acp:agent-send-update agent session-id
+                           (acp:acp-update-agent-message
+                            (acp:acp-text-content (answer (acp:acp-content-text block))))))
+  :end-turn)
+
+(acp:acp-serve-standard-io (make-instance 'my-agent))
+#+end_src
+
+The baseline methods are =AGENT-NEW-SESSION=, =AGENT-PROMPT=, and
+=AGENT-CANCEL=. The library records sessions, validates parameters, answers
+=initialize= with the negotiated version, and only dispatches
+=session/load=, =session/resume=, =session/close=, =session/list=,
+=session/delete=, and =logout= when =AGENT-CAPABILITIES= advertises them.
+
+A prompt turn ends when =AGENT-PROMPT= returns a stop reason keyword. When
+the client sends =session/cancel=, the library marks the session, calls
+=AGENT-CANCEL= so the implementation can interrupt provider requests, and
+turns the turn's result into the =:CANCELLED= stop reason, whether the
+implementation returned normally, signalled =ACP-PROMPT-CANCELLED= from
+=AGENT-CHECK-CANCELLED=, or failed with any other error.
+
+While a turn runs, the agent calls the client through
+=AGENT-REQUEST-PERMISSION=, =AGENT-READ-TEXT-FILE=, =AGENT-WRITE-TEXT-FILE=,
+=AGENT-CREATE-TERMINAL= and the other terminal functions, and
+=AGENT-CREATE-ELICITATION=. Each one signals =ACP-CAPABILITY-ERROR= when the
+client never advertised the capability, so implementations can fall back
+before sending anything. =AGENT-SEND-UPDATE= streams session updates.
+
+Extension methods, whose names begin with an underscore, reach
+=AGENT-EXTENSION-REQUEST= and =AGENT-EXTENSION-NOTIFICATION=.
+
+* Writing a client
+
+Subclass =ACP-CLIENT=, launch the agent, and drive it:
+
+#+begin_src lisp
+(defclass my-client (acp:acp-client) ())
+
+(defmethod acp:client-capabilities ((client my-client))
+  (acp:acp-client-capabilities :read-text-file t :write-text-file t))
+
+(defmethod acp:client-session-update ((client my-client) session-id update params)
+  (declare (ignore session-id params))
+  (when (eq (acp:acp-update-kind update) :agent-message-chunk)
+    (write-string (acp:acp-content-text (acp:json-get update "content")))))
+
+(defmethod acp:client-request-permission ((client my-client) session-id tool-call options params)
+  (declare (ignore session-id tool-call params))
+  (values :selected (acp:json-get (first options) "optionId")))
+
+(defmethod acp:client-read-text-file ((client my-client) session-id path &key line limit params)
+  (declare (ignore session-id line limit params))
+  (uiop:read-file-string path))
+
+(let* ((channel (acp:acp-launch-agent "/usr/local/bin/some-agent" :arguments '("--acp")))
+       (client (make-instance 'my-client)))
+  (acp:acp-client-connect client channel)
+  (unwind-protect
+       (progn
+         (acp:client-initialize client)
+         (let ((session-id (acp:client-new-session client "/home/me/project")))
+           (acp:client-prompt client session-id
+                              (list (acp:acp-text-content "Summarize this project.")))))
+    (acp:connection-close (acp:acp-client-connection client))))
+#+end_src
+
+=CLIENT-INITIALIZE= sends this client's capabilities and implementation
+info, records the agent's capabilities and authentication methods, and
+signals =ACP-UNSUPPORTED-VERSION= when the agent selects a version the
+library cannot speak. =CLIENT-NEW-SESSION=, =CLIENT-LOAD-SESSION=,
+=CLIENT-PROMPT=, =CLIENT-CANCEL=, =CLIENT-SET-CONFIG-OPTION=,
+=CLIENT-LIST-SESSIONS=, and the rest mirror the agent methods; the optional
+ones signal =ACP-CAPABILITY-ERROR= when the agent never advertised them.
+
+Agent requests arrive through =CLIENT-REQUEST-PERMISSION=,
+=CLIENT-READ-TEXT-FILE=, =CLIENT-WRITE-TEXT-FILE=, the =CLIENT-= terminal
+functions, and =CLIENT-CREATE-ELICITATION=. File system, terminal, and
+elicitation requests are only dispatched when =CLIENT-CAPABILITIES=
+advertised them; otherwise the agent receives Method Not Found.
+
+Closing the connection closes the agent's input, waits for it to exit, and
+terminates it when it does not. =ACP-PROCESS-CHANNEL-STDERR-TEXT= holds a
+bounded tail of the agent's standard error and
+=ACP-PROCESS-CHANNEL-EXIT-CODE= its exit code.
+
+* Connections and channels
+
+=ACP-CONNECTION= is a symmetric JSON-RPC connection over an =ACP-CHANNEL=.
+Incoming requests run on their own threads so a long request never blocks
+the notification that cancels it; incoming notifications run on the reader
+thread in arrival order. =CONNECTION-REQUEST= returns the peer's result or
+signals =ACP-REMOTE-ERROR=, =ACP-TIMEOUT= after sending =$/cancel_request=,
+or =ACP-CONNECTION-CLOSED=. Request handlers signal =ACP-METHOD-ERROR= to
+answer with a specific JSON-RPC error and call =ACP-CHECK-CANCELLED= to
+honor cancellation.
+
+Channels carry message lines. =ACP-STANDARD-IO-CHANNEL= wraps this
+process's standard streams as UTF-8, =ACP-LAUNCH-AGENT= wraps a subprocess,
+=MAKE-ACP-STREAM-CHANNEL= wraps any pair of character streams, and
+=MAKE-ACP-CHANNEL-PAIR= returns two connected in-memory channels. Every
+channel bounds its messages at =*ACP-MAXIMUM-MESSAGE-CHARACTERS*=, 16 MiB
+by default; longer incoming messages are discarded and answered with a
+Parse Error.
+
+* Dependencies
+
+- Bordeaux Threads
+- Serapeum
+- Yason
+- ASDF/UIOP
+
+The protocol types follow the upstream schema at
+=*ACP-SCHEMA-REFERENCE*=.
 
 * License
 
