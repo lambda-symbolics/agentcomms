@@ -10,7 +10,7 @@
  (:class qlot/source/ql:source-ql
   :initargs (:%version "2026-01-01")
   :version "ql-2026-01-01"))
-("yason" .
- (:class qlot/source/ql:source-ql
-  :initargs (:%version "2026-01-01")
-  :version "ql-2025-06-22"))
+("argo" .
+ (:class qlot/source/git:source-git
+  :initargs (:remote-url "https://github.com/lambda-symbolics/argo.git" :ref "3658b947372fb19ae07aca65a439b63b0685ae47")
+  :version "git-3658b947372fb19ae07aca65a439b63b0685ae47"))

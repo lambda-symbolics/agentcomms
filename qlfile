@@ -1,3 +1,3 @@
 ql bordeaux-threads 2026-01-01
 ql serapeum 2026-01-01
-ql yason 2026-01-01
+git argo https://github.com/lambda-symbolics/argo.git :ref 3658b947372fb19ae07aca65a439b63b0685ae47
