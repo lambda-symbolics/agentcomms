@@ -35,12 +35,13 @@ Install the locked dependencies and run all tests:
 
 * Values
 
-Wire objects are ordinary JSON values: objects are =EQUAL= hash tables,
-arrays are vectors, JSON booleans are =(JSON-TRUE-VALUE)= and
-=(JSON-FALSE-VALUE)=, and null is =(JSON-NULL-VALUE)=. =JSON-OBJECT= builds
-an object from alternating keys and values and omits =NIL= values, so
-optional fields can be passed straight through. =JSON-GET= reads a field
-with a default, =JSON-SEQUENCE->LIST= turns an array into a list, and
+Wire values follow argo's value model: objects are =EQUAL= hash tables with
+string keys, arrays are vectors, true is =T=, false is argo's =(JSON-FALSE)=
+marker, and null is =NIL=. =JSON-OBJECT= builds an object from alternating
+keys and values and omits =NIL= values, so optional fields can be passed
+straight through; write =:NULL= for an explicit null. =JSON-GET= reads a
+field with a default and reports false and null as =NIL=; =GETHASH= tells
+them apart. =JSON-SEQUENCE->LIST= turns an array into a list, and
 =ACP-FIELD= validates one field of a received object, signalling an Invalid
 Params error for the peer when the type is wrong.
 
@@ -187,9 +188,9 @@ Parse Error.
 
 * Dependencies
 
+- argo
 - Bordeaux Threads
 - Serapeum
-- Yason
 - ASDF/UIOP
 
 The protocol types follow the upstream schema at
