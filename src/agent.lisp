@@ -735,6 +735,27 @@ Return a second value naming the next page cursor when more sessions exist."))
   "Send notification METHOD with PARAMS to the client."
   (connection-notify (agent--connection agent) method params))
 
+(-> agent--update-parameters (string hash-table t) hash-table)
+(defun agent--update-parameters (session-id update meta)
+  "Construct the session update parameters used for preflight and delivery."
+  (json-object "sessionId" session-id "update" update "_meta" meta))
+
+(-> make-agent-update-buffer
+    (acp-agent string &key (:thought-batch-size (integer 1 *)) (:meta t)) acp-update-buffer)
+(defun make-agent-update-buffer (agent session-id &key (thought-batch-size 800) meta)
+  "Create SESSION-ID's buffered sender, preflighting complete notification bounds."
+  (make-acp-update-buffer
+   (lambda (update) (agent-send-update agent session-id update :meta meta))
+   :thought-batch-size thought-batch-size
+   :validator (lambda (update)
+                (let ((channel (acp-connection-channel (agent--connection agent))))
+                  (json-encode
+                   (connection--notification-message
+                    (acp-method-name ':session-update)
+                    (agent--update-parameters session-id update meta))
+                   :limit (min *acp-maximum-message-characters*
+                               (channel-maximum-message-characters channel)))))))
+
 (-> agent-send-update (acp-agent string hash-table &key (:meta t)) null)
 
 
@@ -742,7 +763,7 @@ Return a second value naming the next page cursor when more sessions exist."))
   "Send session UPDATE, built with an ACP-UPDATE- constructor, for SESSION-ID."
   (agent-client-notify agent
                        (acp-method-name ':session-update)
-                       (json-object "sessionId" session-id "update" update "_meta" meta)))
+                       (agent--update-parameters session-id update meta)))
 
 (-> agent-request-permission
     (acp-agent string hash-table list &key (:timeout (or null real)) (:meta t))

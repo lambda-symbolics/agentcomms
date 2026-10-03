@@ -110,6 +110,30 @@ While a turn runs, the agent calls the client through
 client never advertised the capability, so implementations can fall back
 before sending anything. =AGENT-SEND-UPDATE= streams session updates.
 
+** Batching visible thoughts
+
+Create one update buffer per prompt to combine small text thoughts:
+
+#+begin_src lisp
+(let ((updates (acp:make-agent-update-buffer agent session-id :thought-batch-size 800)))
+  (acp:update-buffer-send updates
+                          (acp:acp-update-agent-thought (acp:acp-text-content "Thinking...")))
+  (acp:update-buffer-flush updates))
+#+end_src
+
+Send every update for that prompt through =UPDATE-BUFFER-SEND= to preserve
+ordering. Flush before requesting permission and before returning a prompt
+result, including cancellation and error exits. Use a synchronous notification
+sender; request client decisions after flushing, outside the buffer's lock.
+Compatible text thoughts retain their metadata and coalesce up to the character
+threshold. Large fragments and other content pass through after pending text.
+If delivery fails, retry =UPDATE-BUFFER-FLUSH= to publish the retained batch.
+
+=MAKE-AGENT-UPDATE-BUFFER= validates complete notifications against the connected
+channel's message limit before joining fragments. For another transport, use
+=MAKE-ACP-UPDATE-BUFFER= with a sender and a =:validator= function that checks its
+complete wire message.
+
 Extension methods, whose names begin with an underscore, reach
 =AGENT-EXTENSION-REQUEST= and =AGENT-EXTENSION-NOTIFICATION=.
 

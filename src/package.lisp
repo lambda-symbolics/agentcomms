@@ -55,6 +55,11 @@
    #:json-sequence->list
    #:json-encode
    #:json-decode
+   ;; Buffered updates
+   #:acp-update-buffer
+   #:make-acp-update-buffer
+   #:update-buffer-send
+   #:update-buffer-flush
    ;; Channels
    #:acp-channel
    #:channel-maximum-message-characters
@@ -228,6 +233,7 @@
    #:agent-client-request
    #:agent-client-notify
    #:agent-send-update
+   #:make-agent-update-buffer
    #:agent-request-permission
    #:agent-read-text-file
    #:agent-write-text-file

@@ -274,6 +274,11 @@ server error -32001; responses and cancellation notifications continue."
                :message (format nil "The ACP connection closed while writing: ~A" cause)))))
   nil)
 
+(-> connection--notification-message (string t) hash-table)
+(defun connection--notification-message (method params)
+  "Construct the complete notification used for preflight and wire delivery."
+  (json-object "jsonrpc" "2.0" "method" method "params" (or params (json-object))))
+
 (-> connection-notify (acp-connection string &optional t) null)
 
 
@@ -281,10 +286,7 @@ server error -32001; responses and cancellation notifications continue."
   "Send notification METHOD with PARAMS, which defaults to an empty object."
   (when (acp-connection-closed-p connection)
     (error 'acp-connection-closed))
-  (connection--write connection
-                     (json-object "jsonrpc" "2.0"
-                                  "method" method
-                                  "params" (or params (json-object)))))
+  (connection--write connection (connection--notification-message method params)))
 
 (-> connection-cancel-request (acp-connection t) null)
 
