@@ -54,3 +54,74 @@
   (let ((channel (acp-standard-io-channel)))
     (test-assert (channel-open-p channel))
     (test-equal *acp-maximum-message-characters* (channel-maximum-message-characters channel))))
+
+
+#+sbcl
+(define-test stdio-native-standard-handles
+  (uiop:with-temporary-file (:stream input :direction ':io :element-type 'character
+                                    :external-format ':utf-8)
+    (uiop:with-temporary-file (:stream output :direction ':io :element-type 'character
+                                       :external-format ':utf-8)
+      (write-line "native input ∑" input)
+      (finish-output input)
+      (file-position input 0)
+      (let ((sb-sys:*stdin* input)
+            (sb-sys:*stdout* output)
+            (*standard-output* (make-string-output-stream)))
+        (let ((channel (acp-standard-io-channel)))
+          (test-equal "native input ∑" (channel-read-message channel))
+          (channel-write-message channel "native output ∑")
+          (file-position output 0)
+          (test-equal "native output ∑" (read-line output)))))))
+
+(define-test stream-channel-concurrent-close-waits-for-cleanup
+  (let* ((lock (make-lock "channel close test"))
+         (condition (make-condition-variable))
+         (release-condition (make-condition-variable))
+         (entered-p nil)
+         (released-p nil)
+         (completed-p nil)
+         (observed-p nil)
+         (second-started-p nil)
+         (calls 0)
+         (channel nil)
+         (first-thread nil)
+         (second-thread nil))
+    (setf channel
+          (make-acp-stream-channel
+           :input (make-string-input-stream "")
+           :output (make-string-output-stream)
+           :close-function
+           (lambda ()
+             (incf calls)
+             (channel-close channel)
+             (with-lock-held (lock)
+               (setf entered-p t)
+               (condition-notify condition)
+               (loop until released-p do (condition-wait release-condition lock))
+               (setf completed-p t)))))
+    (unwind-protect
+         (progn
+           (setf first-thread (make-thread (lambda () (channel-close channel))))
+           (with-lock-held (lock)
+             (loop until entered-p do (condition-wait condition lock)))
+           (setf second-thread
+                 (make-thread
+                  (lambda ()
+                    (with-lock-held (lock)
+                      (setf second-started-p t)
+                      (condition-notify condition))
+                    (channel-close channel)
+                    (with-lock-held (lock)
+                      (setf observed-p completed-p)))))
+           (with-lock-held (lock)
+             (loop until second-started-p do (condition-wait condition lock)))
+           (sleep 0.02))
+      (with-lock-held (lock)
+        (setf released-p t)
+        (condition-notify release-condition))
+      (when first-thread (join-thread first-thread))
+      (when second-thread (join-thread second-thread)))
+    (test-assert observed-p "every close caller waits for cleanup completion")
+    (test-equal 1 calls)
+    (test-assert (not (channel-open-p channel)))))

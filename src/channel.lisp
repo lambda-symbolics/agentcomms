@@ -68,6 +68,10 @@ channel's maximum message characters."))
     :accessor acp-stream-channel-open-p
     :type boolean
     :documentation "Whether the channel still accepts messages.")
+   (close-lock
+    :initform (make-recursive-lock "agentcomms stream cleanup")
+    :reader acp-stream-channel-close-lock
+    :documentation "Serialize complete cleanup, including recursive close calls.")
    (lock
     :initform (make-lock "agentcomms stream channel")
     :reader acp-stream-channel-lock
@@ -171,18 +175,19 @@ stream stays aligned on message boundaries."
   (acp-stream-channel-open-p channel))
 
 (defmethod channel-close ((channel acp-stream-channel))
-  "Close both streams once and run the close function."
-  (let ((close-p nil))
-    (with-lock-held ((acp-stream-channel-lock channel))
-      (when (acp-stream-channel-open-p channel)
-        (setf (acp-stream-channel-open-p channel) nil
-              close-p t)))
-    (when close-p
-      (ignore-errors (close (acp-stream-channel-output channel)))
-      (ignore-errors (close (acp-stream-channel-input channel)))
-      (let ((function (acp-stream-channel-close-function channel)))
-        (when function
-          (funcall function)))))
+  "Close once, waiting for concurrent cleanup before returning."
+  (with-recursive-lock-held ((acp-stream-channel-close-lock channel))
+    (let ((close-p nil))
+      (with-lock-held ((acp-stream-channel-lock channel))
+        (when (acp-stream-channel-open-p channel)
+          (setf (acp-stream-channel-open-p channel) nil
+                close-p t)))
+      (when close-p
+        (ignore-errors (close (acp-stream-channel-output channel)))
+        (ignore-errors (close (acp-stream-channel-input channel)))
+        (let ((function (acp-stream-channel-close-function channel)))
+          (when function
+            (funcall function))))))
   nil)
 
 

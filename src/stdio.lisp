@@ -19,13 +19,13 @@
 An agent launched by an editor serves its connection over this channel.
 Nothing else may write to standard output while it is in use."
   (make-acp-stream-channel
-   :input #+sbcl (sb-sys:make-fd-stream 0 :input t
+   :input #+sbcl (sb-sys:make-fd-stream (sb-sys:fd-stream-fd sb-sys:*stdin*) :input t
                                           :external-format ':utf-8
                                           :buffering ':full
                                           :element-type 'character)
           #+ccl (ccl::make-fd-stream 0 :direction ':input :encoding ':utf-8 :sharing ':lock)
           #-(or sbcl ccl) *standard-input*
-   :output #+sbcl (sb-sys:make-fd-stream 1 :output t
+   :output #+sbcl (sb-sys:make-fd-stream (sb-sys:fd-stream-fd sb-sys:*stdout*) :output t
                                            :external-format ':utf-8
                                            :buffering ':full
                                            :element-type 'character)
