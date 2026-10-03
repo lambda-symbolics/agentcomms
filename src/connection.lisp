@@ -386,15 +386,17 @@ Every exit removes the pending request; an abandoned request is cancelled."
 
 
 (defun connection--respond (connection identifier result &key error-object)
-  "Send the response to the peer request IDENTIFIER, ignoring a closed channel."
+  "Send the response to the peer request IDENTIFIER, ignoring a closed channel.
+
+A NIL IDENTIFIER, the decoded null identifier, is answered with a null id."
   (handler-case
       (connection--write connection
-                         (if error-object
-                             (json-object "jsonrpc" "2.0" "id" identifier
-                                          "error" error-object)
-                             (let ((message (json-object "jsonrpc" "2.0" "id" identifier)))
-                               (setf (gethash "result" message) (or result (json-object)))
-                               message)))
+                         (let ((message (json-object "jsonrpc" "2.0"
+                                                     "id" (or identifier ':null))))
+                           (if error-object
+                               (setf (gethash "error" message) error-object)
+                               (setf (gethash "result" message) (or result (json-object))))
+                           message))
     (acp-connection-closed ()
       nil))
   nil)
@@ -403,8 +405,10 @@ Every exit removes the pending request; an abandoned request is cancelled."
 
 
 (defun connection--identifier-p (value)
-  "Return whether VALUE is a JSON-RPC string, number, or null identifier."
-  (and (or (realp value) (stringp value) (json-null-p value)) t))
+  "Return whether VALUE is a JSON-RPC string, number, or null identifier.
+
+A decoded null identifier is NIL."
+  (and (or (realp value) (stringp value) (null value)) t))
 
 
 (-> connection--complete-pending (acp-connection hash-table) null)
@@ -420,7 +424,7 @@ Every exit removes the pending request; an abandoned request is cancelled."
           (remhash identifier (acp-connection-pending connection))
           (multiple-value-bind (error-object error-present-p)
               (gethash "error" message)
-            (if (and error-present-p (not (json-null-p error-object)))
+            (if (and error-present-p error-object)
                 (setf (acp-pending-request-failure pending)
                       (let ((code (json-get error-object "code")))
                         (make-condition 'acp-remote-error :method
@@ -563,21 +567,20 @@ Every exit removes the pending request; an abandoned request is cancelled."
   (let ((message
          (handler-case (json-decode text)
            (acp-error (condition)
-             (connection--respond connection ':null nil :error-object
+             (connection--respond connection nil nil :error-object
                                   (connection--error-object -32700
                                                             (acp-error-message
                                                              condition)))
              (return-from connection--dispatch nil)))))
     (cond
       ((not (json-object-p message))
-       (connection--respond connection ':null nil :error-object
+       (connection--respond connection nil nil :error-object
                             (connection--error-object -32600
                                                       "A JSON-RPC message must be an object.")))
       ((not (equal (json-get message "jsonrpc") "2.0"))
        (connection--respond connection
-                            (if (connection--identifier-p (json-get message "id"))
-                                (json-get message "id")
-                                ':null)
+                            (and (connection--identifier-p (json-get message "id"))
+                                 (json-get message "id"))
                             nil :error-object
                             (connection--error-object -32600
                                                       "The jsonrpc member must be \"2.0\".")))
@@ -588,7 +591,7 @@ Every exit removes the pending request; an abandoned request is cancelled."
                ((connection--identifier-p identifier)
                 (connection--dispatch-request connection message))
                (t
-                (connection--respond connection ':null nil :error-object
+                (connection--respond connection nil nil :error-object
                                      (connection--error-object -32600
                                                                "The request id must be a string, number, or null."))))))
       ((and (nth-value 1 (gethash "id" message))
@@ -596,7 +599,7 @@ Every exit removes the pending request; an abandoned request is cancelled."
                 (nth-value 1 (gethash "error" message))))
        (connection--complete-pending connection message))
       (t
-       (connection--respond connection ':null nil :error-object
+       (connection--respond connection nil nil :error-object
                             (connection--error-object -32600
                                                       "The message is neither a request, a notification, nor a response.")))))
   nil)
@@ -613,7 +616,7 @@ Every exit removes the pending request; an abandoned request is cancelled."
          (let ((text (handler-case
                          (channel-read-message (acp-connection-channel connection))
                        (acp-message-too-large (condition)
-                         (connection--respond connection ':null nil
+                         (connection--respond connection nil nil
                                               :error-object (connection--error-object
                                                              -32700
                                                              (acp-error-message condition)))

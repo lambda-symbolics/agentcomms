@@ -411,7 +411,7 @@ Return a second value naming the next page cursor when more sessions exist."))
 
 (defun agent--initialize (agent params)
   "Negotiate the version, record the client, and build the initialize response."
-  (let ((version (agent--negotiate-version (json-get params "protocolVersion" ':null)))
+  (let ((version (agent--negotiate-version (json-get params "protocolVersion")))
         (client-capabilities (acp-field params "clientCapabilities" :type ':object))
         (client-info (acp-field params "clientInfo" :type ':object))
         (capabilities (agent-capabilities agent)))
@@ -568,12 +568,12 @@ Return a second value naming the next page cursor when more sessions exist."))
 (defun agent--config-option-value (params)
   "Return the value of a set_config_option request as a string, T, or NIL."
   (let ((type (acp-field params "type" :type ':string))
-        (value (json-get params "value" ':null)))
+        (value (gethash "value" params)))
     (cond
       ((equal type "boolean")
-       (unless (json-boolean-p value)
+       (unless (or (eq value t) (json-false-p value))
          (acp-invalid-params "A boolean option takes a boolean value."))
-       (json-true-p value))
+       (eq value t))
       ((stringp value)
        value)
       (t
@@ -597,7 +597,7 @@ Return a second value naming the next page cursor when more sessions exist."))
   (declare (ignore connection))
   (let ((keyword (acp-method-keyword method)))
     (when (and keyword (not (eq keyword ':initialize))) (agent--require-initialized agent method))
-    (unless (or (json-object-p params) (null params) (json-null-p params))
+    (unless (or (json-object-p params) (null params))
       (acp-invalid-params "The params must be an object."))
     (let ((params
            (if (json-object-p params)
@@ -881,7 +881,7 @@ and the terminating signal."
       (multiple-value-bind (exited-p code signal)
           (agent--exit-status (json-get result "exitStatus"))
         (values output
-                (json-true-p (json-get result "truncated"))
+                (eq (json-get result "truncated") t)
                 exited-p
                 code
                 signal)))))

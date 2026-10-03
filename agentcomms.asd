@@ -4,9 +4,9 @@
   :license "COLL-Attribution"
   :version "0.1.0"
   :serial t
-  :depends-on (#:bordeaux-threads
-               #:serapeum
-               #:yason)
+  :depends-on (#:argo
+               #:bordeaux-threads
+               #:serapeum)
   :components ((:module "src"
                 :serial t
                 :components ((:file "package")

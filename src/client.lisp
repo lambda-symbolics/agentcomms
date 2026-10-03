@@ -250,13 +250,13 @@ accepted form, the content object."))
 
 (defun client--exit-status-object (exit-code signal)
   "Return a terminal exit status object with null for absent fields."
-  (json-object "exitCode" (or exit-code (json-null-value))
-               "signal" (or signal (json-null-value))))
+  (json-object "exitCode" (or exit-code ':null)
+               "signal" (or signal ':null)))
 
 (defmethod peer-handle-request ((client acp-client) connection method params)
   "Dispatch an agent request to the client's generic functions."
   (declare (ignore connection))
-  (unless (or (json-object-p params) (null params) (json-null-p params))
+  (unless (or (json-object-p params) (null params))
     (acp-invalid-params "The params must be an object."))
   (let ((params (if (json-object-p params) params (json-object)))
         (keyword (acp-method-keyword method)))

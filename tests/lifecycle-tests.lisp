@@ -7,10 +7,10 @@
       (let ((connection (make-acp-connection :channel server-channel
                                              :peer (make-instance 'test-echo-peer))))
         (unwind-protect
-             (dolist (identifier '("named-request" 7 1.25 :null))
+             (dolist (identifier '("named-request" 7 1.25 nil))
                (channel-write-message
                 client-channel
-                (json-encode (json-object "jsonrpc" "2.0" "id" identifier
+                (json-encode (json-object "jsonrpc" "2.0" "id" (or identifier ':null)
                                           "method" "echo" "params" (json-object "text" "value"))))
                (let ((response (json-decode (channel-read-message client-channel))))
                  (test-equal identifier (json-get response "id") :test #'equalp)

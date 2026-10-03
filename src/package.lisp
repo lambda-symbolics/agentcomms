@@ -12,6 +12,14 @@
                 #:make-thread
                 #:thread-alive-p
                 #:with-lock-held)
+  (:import-from #:argo
+                #:json-error
+                #:json-false
+                #:json-false-p
+                #:json-limits
+                #:json-object-p
+                #:json-true-p
+                #:make-json-limits)
   (:import-from #:serapeum
                 #:->)
   (:export
@@ -42,12 +50,7 @@
    #:*acp-maximum-message-characters*
    #:json-object
    #:json-get
-   #:json-true-value
-   #:json-false-value
-   #:json-null-value
    #:json-true-p
-   #:json-boolean-p
-   #:json-null-p
    #:json-object-p
    #:json-sequence->list
    #:json-encode

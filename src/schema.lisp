@@ -312,8 +312,8 @@ TYPE is :STRING, :ABSOLUTE-PATH, :INTEGER, :NUMBER, :BOOLEAN, :OBJECT,
 :ARRAY, or :ANY. Null/absence yield DEFAULT, or Invalid Params when
 REQUIRED-P. Booleans return T/NIL, arrays lists, other values as decoded."
   (unless (json-object-p object) (acp-invalid-params "A parameter object is required."))
-  (let ((value (json-get object key ':null)))
-    (when (json-null-p value)
+  (let ((value (gethash key object)))
+    (when (null value)
       (when required-p (acp-invalid-params "The field ~A is required." key))
       (return-from acp-field default))
     (flet ((reject ()
@@ -333,9 +333,13 @@ REQUIRED-P. Booleans return T/NIL, arrays lists, other values as decoded."
              value
              (reject)))
         (:boolean
-         (if (json-boolean-p value)
-             (json-true-p value)
-             (reject)))
+         (cond
+           ((eq value t)
+            t)
+           ((json-false-p value)
+            nil)
+           (t
+            (reject))))
         (:object
          (if (json-object-p value)
              value
@@ -359,8 +363,8 @@ object. Missing intermediate objects, null, and false all mean unsupported."
     (dolist (key (acp--split-path path))
       (unless (json-object-p value)
         (return-from acp-capability-enabled-p nil))
-      (setf value (json-get value key ':null)))
-    (and (or (json-true-p value) (json-object-p value)) t)))
+      (setf value (gethash key value)))
+    (and (or (eq value t) (json-object-p value)) t)))
 
 (-> acp--split-path (string) list)
 
@@ -395,7 +399,7 @@ object. Missing intermediate objects, null, and false all mean unsupported."
 
 (defun acp-boolean (value)
   "Return the JSON boolean for Lisp boolean VALUE."
-  (if value (json-true-value) (json-false-value)))
+  (if value t (json-false)))
 
 (-> acp-agent-capabilities
     (&key (:load-session boolean) (:image boolean) (:audio boolean)

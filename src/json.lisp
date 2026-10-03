@@ -2,55 +2,23 @@
 
 ;;;; -- Bounded JSON Documents --
 
+;;; argo owns the JSON value model: objects are EQUAL hash tables with string
+;;; keys, arrays vectors, true T, false argo's marker, which JSON-GET reports
+;;; as NIL, and null NIL. Writing :NULL also produces null, which is how an
+;;; explicit null is spelled in JSON-OBJECT, since that builder omits NIL. This
+;;; file adds the protocol's message bounds and conditions at the boundary.
+
 (defparameter *acp-maximum-message-characters* (* 16 1024 1024)
   "The largest JSON-RPC message accepted or produced, in characters.")
 
 (defparameter *json-maximum-depth* 64
-  "The deepest container nesting accepted in one decoded document.")
+  "The deepest container nesting accepted in one document.")
 
 (defparameter *json-maximum-nodes* 100000
-  "The most values, keys included, accepted in one decoded document.")
+  "The most values, keys included, accepted in one document.")
 
 (defparameter *json-diagnostic-limit* 512
   "The longest payload excerpt carried by a protocol condition.")
-
-
-;;;; -- Canonical Values --
-
-(-> json-true-value () t)
-(defun json-true-value ()
-  "Return the value representing JSON true."
-  'yason:true)
-
-(-> json-false-value () t)
-(defun json-false-value ()
-  "Return the value representing JSON false."
-  'yason:false)
-
-(-> json-null-value () keyword)
-(defun json-null-value ()
-  "Return the value representing JSON null."
-  ':null)
-
-(-> json-true-p (t) boolean)
-(defun json-true-p (value)
-  "Return true exactly when VALUE is JSON true."
-  (eq value 'yason:true))
-
-(-> json-boolean-p (t) boolean)
-(defun json-boolean-p (value)
-  "Return true when VALUE is one of the JSON boolean symbols."
-  (and (or (eq value 'yason:true) (eq value 'yason:false)) t))
-
-(-> json-null-p (t) boolean)
-(defun json-null-p (value)
-  "Return true when VALUE is JSON null."
-  (eq value ':null))
-
-(-> json-object-p (t) boolean)
-(defun json-object-p (value)
-  "Return true when VALUE is a decoded JSON object."
-  (and (hash-table-p value) t))
 
 
 ;;;; -- Construction and Access --
@@ -59,7 +27,8 @@
 (defun json-object (&rest pairs)
   "Return an EQUAL hash table populated from alternating string keys and values.
 
-A value of NIL omits its key, so optional fields can be passed directly."
+A value of NIL omits its key, so optional fields can be passed directly;
+write :NULL for an explicit JSON null."
   (unless (evenp (length pairs))
     (error 'acp-protocol-error
            :message "JSON object construction requires key and value pairs."))
@@ -74,20 +43,28 @@ A value of NIL omits its key, so optional fields can be passed directly."
 
 (-> json-get (t string &optional t) t)
 (defun json-get (object key &optional default)
-  "Return KEY from JSON OBJECT, or DEFAULT when absent or when OBJECT is no object."
+  "Return KEY from JSON OBJECT, or DEFAULT when absent or when OBJECT is no object.
+
+JSON false and null both read as NIL; use GETHASH to tell them apart."
   (if (hash-table-p object)
       (multiple-value-bind (value present-p)
           (gethash key object)
-        (if present-p value default))
+        (cond
+          ((not present-p)
+           default)
+          ((json-false-p value)
+           nil)
+          (t
+           value)))
       default))
 
 (-> json-sequence->list (t) list)
 (defun json-sequence->list (value)
-  "Return JSON array VALUE as a fresh list, treating absence as empty."
+  "Return JSON array VALUE as a fresh list, treating absence and null as empty."
   (cond
     ((null value)
      nil)
-    ((vectorp value)
+    ((and (vectorp value) (not (stringp value)))
      (coerce value 'list))
     ((listp value)
      (copy-list value))
@@ -114,106 +91,45 @@ A value of NIL omits its key, so optional fields can be passed directly."
         (concatenate 'string (subseq text 0 limit) "...")
         text)))
 
-(-> json--measure (t integer) integer)
-(defun json--measure (value depth)
-  "Return the node count of VALUE while enforcing the depth and node bounds."
-  (when (> depth *json-maximum-depth*)
-    (error 'acp-protocol-error
-           :message (format nil "The JSON document nests deeper than ~D levels."
-                            *json-maximum-depth*)))
-  (let ((count 1))
-    (flet ((add (nodes)
-             (incf count nodes)
-             (when (> count *json-maximum-nodes*)
-               (error 'acp-protocol-error
-                      :message (format nil "The JSON document has more than ~D nodes."
-                                       *json-maximum-nodes*)))))
-      (cond
-        ((hash-table-p value)
-         (maphash (lambda (key element)
-                    (declare (ignore key))
-                    (add (1+ (json--measure element (1+ depth)))))
-                  value))
-        ((and (vectorp value) (not (stringp value)))
-         (loop for element across value
-               do (add (json--measure element (1+ depth)))))
-        ((consp value)
-         (dolist (element value)
-           (add (json--measure element (1+ depth))))))
-      count)))
+(-> json--limits () json-limits)
+(defun json--limits ()
+  "Return the structural bounds currently configured for one document."
+  (make-json-limits :maximum-depth *json-maximum-depth*
+                    :maximum-nodes *json-maximum-nodes*))
 
 (-> json-encode (t &key (:limit integer)) string)
 (defun json-encode (value &key (limit *acp-maximum-message-characters*))
-  "Return VALUE as one compact JSON line without embedded newlines.
+  "Return VALUE as one compact JSON line within LIMIT characters.
 
-Lists encode as arrays, hash tables as objects, and the canonical boolean
-and null values as their JSON literals. The result must fit within LIMIT
-characters."
-  (json--measure value 0)
-  (let ((text (with-output-to-string (stream)
-                (let ((yason:*list-encoder* #'yason:encode-plain-list-to-array))
-                  (yason:encode (json--prepare value) stream)))))
+VALUE follows argo's value model. A value with no JSON form, or one beyond
+the structural bounds, signals ACP-PROTOCOL-ERROR, and a result longer than
+LIMIT signals ACP-MESSAGE-TOO-LARGE."
+  (let ((text (handler-case
+                  (argo:json-encode value :limits (json--limits))
+                (json-error (condition)
+                  (error 'acp-protocol-error
+                         :message (format nil "Could not encode JSON: ~A" condition)
+                         :payload (bounded-diagnostic value))))))
     (when (> (length text) limit)
       (error 'acp-message-too-large
              :message (format nil "The outgoing message exceeds ~D characters." limit)
              :limit limit))
-    (when (find #\Newline text)
-      (error 'acp-protocol-error
-             :message "The encoded JSON contains a raw newline."))
     text))
-
-(-> json--prepare (t) t)
-(defun json--prepare (value)
-  "Return VALUE with NIL spelled as an empty array and containers prepared.
-
-Lists are arrays in this encoding, so NIL is the empty array. Booleans use
-the canonical symbols and null the :NULL keyword, which Yason encodes
-natively."
-  (cond
-    ((null value)
-     (vector))
-    ((stringp value)
-     value)
-    ((hash-table-p value)
-     (let ((copy (make-hash-table :test #'equal)))
-       (maphash (lambda (key element)
-                  (setf (gethash key copy) (json--prepare element)))
-                value)
-       copy))
-    ((vectorp value)
-     (map 'vector #'json--prepare value))
-    ((consp value)
-     (mapcar #'json--prepare value))
-    (t
-     value)))
 
 (-> json-decode (string &key (:limit integer)) t)
 (defun json-decode (source &key (limit *acp-maximum-message-characters*))
-  "Decode one JSON document from SOURCE within LIMIT characters.
+  "Decode exactly one JSON document from SOURCE within LIMIT characters.
 
-Objects become EQUAL hash tables, arrays vectors, booleans the canonical
-symbols, and null the :NULL keyword. Trailing non-blank text is an error."
+The result follows argo's value model. A SOURCE longer than LIMIT signals
+ACP-MESSAGE-TOO-LARGE; malformed JSON, trailing text, and documents beyond
+the structural bounds signal ACP-PROTOCOL-ERROR."
   (when (> (length source) limit)
     (error 'acp-message-too-large
            :message (format nil "The incoming message exceeds ~D characters." limit)
            :limit limit))
-  (let ((value
-          (handler-case
-              (with-input-from-string (stream source)
-                (let ((decoded (yason:parse stream
-                                            :json-arrays-as-vectors t
-                                            :json-booleans-as-symbols t
-                                            :json-nulls-as-keyword t)))
-                  (loop for character = (read-char stream nil nil)
-                        while character
-                        unless (member character '(#\Space #\Tab #\Return #\Newline))
-                          do (error "Unexpected text follows the JSON document."))
-                  decoded))
-            (acp-error (condition)
-              (error condition))
-            (error (cause)
-              (error 'acp-protocol-error
-                     :message (format nil "Could not decode JSON: ~A" cause)
-                     :payload (bounded-diagnostic source))))))
-    (json--measure value 0)
-    value))
+  (handler-case
+      (argo:json-decode source :limits (json--limits))
+    (json-error (condition)
+      (error 'acp-protocol-error
+             :message (format nil "Could not decode JSON: ~A" condition)
+             :payload (bounded-diagnostic source)))))

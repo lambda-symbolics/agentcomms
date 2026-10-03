@@ -132,7 +132,7 @@
     (test-equal "USD" (json-get (json-get (acp-update-usage 10 100 :cost-amount 0.5 :cost-currency "USD") "cost")
                                 "currency"))
     (test-assert (not (nth-value 1 (gethash "cost" (acp-update-usage 10 100)))))
-    (test-assert (json-null-p (json-get (acp-update-session-info :title ':null) "title")))
+    (test-equal "null" (json-encode (json-get (acp-update-session-info :title ':null) "title")))
     (test-equal "hint" (json-get (json-get (acp-available-command "web" "Search" :hint "hint") "input") "hint"))
     (test-equal "code" (json-get (acp-update-current-mode "code") "currentModeId"))
     (test-equal "mode" (json-get (acp-config-option-select "mode" "Mode" "ask"
@@ -140,7 +140,7 @@
                                                            :category ':mode)
                                  "category"))
     (test-equal "_custom" (json-get (acp-config-option-boolean "b" "B" t :category "_custom") "category"))
-    (test-assert (json-true-p (json-get (acp-config-option-boolean "b" "B" t) "currentValue")))))
+    (test-equal t (json-get (acp-config-option-boolean "b" "B" t) "currentValue"))))
 
 (define-test schema-mcp-servers
   (let ((servers (list (acp-mcp-server-stdio "fs" "/bin/server" :arguments '("--stdio")
