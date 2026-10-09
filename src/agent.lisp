@@ -490,7 +490,8 @@ Return a second value naming the next page cursor when more sessions exist."))
         (when (or (acp-agent-session-prompt-active-p session)
                   (acp-agent-session-closing-p session))
           (error 'acp-method-error :code -32001 :message "The session is busy or closing."))
-        (setf (acp-agent-session-prompt-active-p session) t)))
+        (setf (acp-agent-session-prompt-active-p session) t
+              (acp-agent-session-cancel-requested-p session) nil)))
     (unwind-protect
          (let ((stop-reason
                 (if (or (agent-session-cancelled-p agent session-id)
@@ -540,9 +541,9 @@ Return a second value naming the next page cursor when more sessions exist."))
     (let ((active-p nil))
       (with-lock-held ((acp-agent-lock agent))
         (when closing-p (setf (acp-agent-session-closing-p session) t))
-        (setf (acp-agent-session-cancel-requested-p session) t)
         (when (or closing-p (acp-agent-session-prompt-active-p session))
-          (setf active-p t)))
+          (setf (acp-agent-session-cancel-requested-p session) t
+                active-p t)))
       (when active-p (agent-cancel agent (acp-agent-session-identifier session)))))
   nil)
 

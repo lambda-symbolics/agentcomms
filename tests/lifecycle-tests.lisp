@@ -221,13 +221,3 @@
                                                                                     "cwd" "/other" "mcpServers" #())))
                (test-assert (eq session (acp-agent-session agent "sess-1")))))
         (connection-close client))))
-
-(define-test agent-cancellation-before-prompt-admission-is-latched
-  (let* ((agent (make-instance 'test-agent))
-         (session (agent--register-session agent "session" "/work")))
-    (agent--cancel-session agent session)
-    (let ((result (agent--run-prompt agent session
-                                      (list (acp-text-content "unused"))
-                                      (json-object))))
-      (test-equal "cancelled" (json-get result "stopReason"))
-      (test-assert (null (test-agent-prompts agent))))))

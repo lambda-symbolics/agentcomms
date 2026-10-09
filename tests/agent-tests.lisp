@@ -195,6 +195,111 @@
 
 
 ;;;; -- Agent Tests --
+(defclass admission-gate-agent (test-agent)
+  ((lock
+    :initform (make-lock "admission gate")
+    :reader admission-gate-lock
+    :documentation "The lock guarding the admission gate.")
+   (condition
+    :initform (make-condition-variable)
+    :reader admission-gate-condition
+    :documentation "The condition used to release the admission gate.")
+   (entered-p
+    :initform nil
+    :accessor admission-gate-entered-p
+    :documentation "Whether prompt dispatch reached the gate.")
+   (release-p
+    :initform nil
+    :accessor admission-gate-release-p
+    :documentation "Whether the prompt dispatch gate is released."))
+  (:documentation "A test agent that pauses prompt dispatch before admission."))
+
+(defmethod peer-handle-request ((agent admission-gate-agent) connection method params)
+  "Pause a prompt request before AGENT--RUN-PROMPT and then dispatch it."
+  (if (string= method "session/prompt")
+      (progn
+        (with-lock-held ((admission-gate-lock agent))
+          (setf (admission-gate-entered-p agent) t)
+          (condition-notify (admission-gate-condition agent))
+          (loop until (admission-gate-release-p agent)
+                do (condition-wait (admission-gate-condition agent)
+                                   (admission-gate-lock agent))))
+        (call-next-method))
+      (call-next-method)))
+
+(defun release-admission-gate (agent)
+  "Release AGENT's prompt dispatch gate."
+  (with-lock-held ((admission-gate-lock agent))
+    (setf (admission-gate-release-p agent) t)
+    (condition-notify (admission-gate-condition agent)))
+  nil)
+
+(define-test agent-idle-cancel-does-not-poison-next-prompt
+  (multiple-value-bind (client agent peer) (test-agent-pair)
+    (declare (ignore peer))
+    (unwind-protect
+         (progn
+           (connection-request client "session/new"
+                               (json-object "cwd" "/w" "mcpServers" (vector)))
+           (connection-notify client "session/cancel" (json-object "sessionId" "sess-1"))
+           (test-equal "end_turn"
+                       (json-get (connection-request client "session/prompt"
+                                                     (json-object "sessionId" "sess-1"
+                                                                  "prompt"
+                                                                  (vector (acp-text-content "hello"))))
+                                 "stopReason"))
+           (test-equal 1 (length (test-agent-prompts agent))))
+      (connection-close client))))
+
+(define-test agent-cancelled-request-waiting-for-admission-skips-prompt
+  (multiple-value-bind (left right) (make-acp-channel-pair)
+    (let* ((agent (make-instance 'admission-gate-agent))
+           (peer (make-instance 'test-client-peer))
+           (client nil)
+           (result nil)
+           (thread nil))
+      (acp-agent-connect agent right :name "gated agent")
+      (setf client (make-acp-connection :channel left :peer peer :name "gated client"))
+      (unwind-protect
+           (progn
+             (connection-request client "initialize"
+                                 (json-object "protocolVersion" 1
+                                              "clientCapabilities" (json-object)))
+             (connection-request client "session/new"
+                                 (json-object "cwd" "/w" "mcpServers" (vector)))
+             (setf thread
+                   (make-thread
+                    (lambda ()
+                      (setf result
+                            (connection-request
+                             client "session/prompt"
+                             (json-object "sessionId" "sess-1"
+                                          "prompt" (vector (acp-text-content "hello")))
+                             :on-sent
+                             (lambda (identifier)
+                               (loop until (admission-gate-entered-p agent) do (sleep 0.001))
+                               (connection-notify
+                                client "$/cancel_request"
+                                (json-object "requestId" identifier))))))))
+             (test-assert
+              (test-wait-until (lambda () (admission-gate-entered-p agent)))
+              "prompt dispatch reaches the admission gate")
+             (test-assert
+              (test-wait-until
+               (lambda ()
+                 (loop for request being the hash-values of (acp-connection-inbound
+                                              (acp-agent-connection agent))
+                             thereis (and (string= "session/prompt"
+                                                 (acp-inbound-request-method request))
+                                         (acp-inbound-request-cancelled-p request)))))
+              "wire cancellation reaches the waiting request")
+             (release-admission-gate agent)
+             (join-thread thread)
+             (test-equal "cancelled" (json-get result "stopReason"))
+             (test-equal nil (test-agent-prompts agent)))
+        (when thread (release-admission-gate agent) (join-thread thread))
+        (when client (connection-close client))
+        (channel-close right)))))
 
 (define-test agent-initialization-and-gating
   (multiple-value-bind (left right)

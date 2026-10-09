@@ -176,7 +176,8 @@ Subclass =ACP-CLIENT=, launch the agent, and drive it:
 info, records the agent's capabilities and authentication methods, and
 signals =ACP-UNSUPPORTED-VERSION= when the agent selects a version the
 library cannot speak. =CLIENT-NEW-SESSION=, =CLIENT-LOAD-SESSION=,
-=CLIENT-PROMPT=, =CLIENT-CANCEL=, =CLIENT-SET-CONFIG-OPTION=,
+=CLIENT-PROMPT= accepts =:ON-SENT= to receive the written wire request id before
+waiting for the prompt result. =CLIENT-CANCEL=, =CLIENT-SET-CONFIG-OPTION=,
 =CLIENT-LIST-SESSIONS=, and the rest mirror the agent methods; the optional
 ones signal =ACP-CAPABILITY-ERROR= when the agent never advertised them.
 
@@ -198,7 +199,9 @@ Incoming requests run on their own threads so a long request never blocks
 the notification that cancels it; incoming notifications run on the reader
 thread in arrival order. =CONNECTION-REQUEST= returns the peer's result or
 signals =ACP-REMOTE-ERROR=, =ACP-TIMEOUT= after sending =$/cancel_request=,
-or =ACP-CONNECTION-CLOSED=. Request handlers signal =ACP-METHOD-ERROR= to
+or =ACP-CONNECTION-CLOSED=. Its optional =:ON-SENT= callback receives the integer
+wire request id after the request is written and before waiting for the result, which
+allows a caller to send a matching cancellation request without guessing the id. Request handlers signal =ACP-METHOD-ERROR= to
 answer with a specific JSON-RPC error and call =ACP-CHECK-CANCELLED= to
 honor cancellation.
 
