@@ -404,15 +404,20 @@ accepted form, the content object."))
     (error 'acp-state-error :message "Call CLIENT-INITIALIZE before other agent methods."))
   nil)
 
-(-> client-agent-request (acp-client string t &key (:timeout (or null real))) t)
+(-> client-agent-request
+    (acp-client string t &key (:timeout (or null real)) (:on-sent (or null function)))
+    t)
 
 
-(defun client-agent-request (client method params &key (timeout nil timeout-p))
-  "Send request METHOD with PARAMS to the agent and return its result."
+(defun client-agent-request (client method params &key (timeout nil timeout-p) on-sent)
+  "Send request METHOD with PARAMS to the agent and return its result.
+
+When ON-SENT is supplied, call it with the JSON-RPC request identifier after
+the request has been written and before waiting for its response."
   (let ((connection (client--connection client)))
     (if timeout-p
-        (connection-request connection method params :timeout timeout)
-        (connection-request connection method params))))
+        (connection-request connection method params :timeout timeout :on-sent on-sent)
+        (connection-request connection method params :on-sent on-sent))))
 
 (-> client-agent-notify (acp-client string t) null)
 
@@ -551,11 +556,12 @@ selects a version this library cannot speak."
                         (json-object "sessionId" session-id "_meta" meta)))
 
 (-> client-prompt
-    (acp-client string list &key (:timeout (or null real)) (:meta t))
+    (acp-client string list &key (:timeout (or null real)) (:meta t)
+                (:on-sent (or null function)))
     (values keyword hash-table))
 
 
-(defun client-prompt (client session-id prompt &key (timeout nil timeout-p) meta)
+(defun client-prompt (client session-id prompt &key (timeout nil timeout-p) meta on-sent)
   "Send the content blocks PROMPT to SESSION-ID and wait for the turn to end.
 
 Return the stop reason keyword, :UNKNOWN-STOP-REASON for an unrecognized
@@ -566,8 +572,9 @@ value, and the whole result."
                               "_meta" meta))
          (result (if timeout-p
                      (client-agent-request client (acp-method-name ':session-prompt) params
-                                           :timeout timeout)
-                     (client-agent-request client (acp-method-name ':session-prompt) params))))
+                                           :timeout timeout :on-sent on-sent)
+                     (client-agent-request client (acp-method-name ':session-prompt) params
+                                           :on-sent on-sent))))
     (values (stop-reason-keyword (json-get result "stopReason") :default ':unknown-stop-reason)
             result)))
 

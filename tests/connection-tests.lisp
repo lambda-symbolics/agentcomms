@@ -297,3 +297,42 @@
     (test-signals acp-message-too-large (channel-read-message channel))
     (test-equal "ok" (channel-read-message channel))
     (test-signals acp-message-too-large (channel-write-message channel "too long"))))
+
+(define-test connection-on-sent-callback-identifies-written-request
+  (multiple-value-bind (left right left-peer right-peer)
+      (test-connection-pair)
+    (declare (ignore left-peer right-peer))
+    (unwind-protect
+         (let ((identifier nil)
+               (called-thread nil))
+           (test-equal "value"
+                       (json-get
+                        (connection-request
+                         left "echo" (json-object "text" "value")
+                         :on-sent (lambda (sent)
+                                    (setf identifier sent
+                                          called-thread (current-thread))))
+                        "text"))
+           (test-assert (integerp identifier))
+           (test-assert (eq called-thread (current-thread))))
+      (connection-close left)
+      (connection-close right))))
+
+(define-test connection-on-sent-failure-cleans-pending-request
+  (multiple-value-bind (left right left-peer right-peer)
+      (test-connection-pair)
+    (declare (ignore left-peer right-peer))
+    (unwind-protect
+         (progn
+           (test-signals error
+                         (connection-request
+                          left "echo" nil
+                          :on-sent (lambda (identifier)
+                                     (declare (ignore identifier))
+                                     (error "callback failed"))))
+           (test-equal "value"
+                       (json-get (connection-request left "echo"
+                                                      (json-object "text" "value"))
+                                 "text")))
+      (connection-close left)
+      (connection-close right))))

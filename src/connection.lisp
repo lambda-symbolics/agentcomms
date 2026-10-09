@@ -334,12 +334,14 @@ server error -32001; responses and cancellation notifications continue."
                             (and remaining (max remaining 0.001))))))))))
 
 
-(-> connection-request (acp-connection string t &key (:timeout (or null real))) t)
+(-> connection-request
+    (acp-connection string t &key (:timeout (or null real)) (:on-sent (or null function)))
+    t)
 
 
 (defun connection-request
     (connection method params
-     &key (timeout (acp-connection-request-timeout connection)))
+     &key (timeout (acp-connection-request-timeout connection)) on-sent)
   "Send METHOD with PARAMS and return its result within TIMEOUT seconds.
 
 Signal ACP-REMOTE-ERROR, ACP-CONNECTION-CLOSED, or ACP-TIMEOUT on failure.
@@ -360,6 +362,8 @@ Every exit removes the pending request; an abandoned request is cancelled."
                                            (acp-pending-request-identifier pending)
                                            "method" method "params"
                                            (or params (json-object))))
+           (when on-sent
+             (funcall on-sent (acp-pending-request-identifier pending)))
            (let ((result (connection--await connection pending timeout)))
              (when (eq result ':timeout)
                (error 'acp-timeout :message
