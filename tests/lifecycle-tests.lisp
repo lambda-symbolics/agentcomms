@@ -221,3 +221,49 @@
                                                                                     "cwd" "/other" "mcpServers" #())))
                (test-assert (eq session (acp-agent-session agent "sess-1")))))
         (connection-close client))))
+
+
+;;;; -- Reader Shutdown Boundaries --
+
+(defclass lifecycle-test-notification-peer (test-echo-peer)
+  ((entered-p
+    :initform nil
+    :accessor lifecycle-test-notification-entered-p
+    :type boolean
+    :documentation "Whether the reader entered the notification callback.")
+   (completed-p
+    :initform nil
+    :accessor lifecycle-test-notification-completed-p
+    :type boolean
+    :documentation "Whether the callback finished after connection closure."))
+  (:documentation "A peer whose notification callback spans a concurrent close."))
+
+(defmethod peer-handle-notification
+    ((peer lifecycle-test-notification-peer) connection method params)
+  "Finish an admitted notification even when another thread closes the connection."
+  (declare (ignore method params))
+  (with-lock-held ((test-echo-peer-lock peer))
+    (setf (lifecycle-test-notification-entered-p peer) t))
+  (loop while (connection-open-p connection) do (sleep 0.001))
+  (sleep 0.05)
+  (setf (lifecycle-test-notification-completed-p peer) t)
+  nil)
+
+(define-test connection-close-finishes-notification-dispatch
+  (multiple-value-bind (channel remote) (make-acp-channel-pair)
+    (let* ((peer (make-instance 'lifecycle-test-notification-peer))
+           (connection (make-acp-connection :channel channel :peer peer)))
+      (unwind-protect
+           (progn
+             (channel-write-message remote "{\"jsonrpc\":\"2.0\",\"method\":\"notify\"}")
+             (test-assert
+              (test-wait-until
+               (lambda ()
+                 (with-lock-held ((test-echo-peer-lock peer))
+                   (lifecycle-test-notification-entered-p peer)))))
+             (connection-close connection)
+             (test-assert (lifecycle-test-notification-completed-p peer))
+             (test-equal nil (join-thread (acp-connection-reader-thread connection)))
+             (test-equal 1 (test-echo-peer-closed-count peer)))
+        (connection-close connection)
+        (channel-close remote)))))

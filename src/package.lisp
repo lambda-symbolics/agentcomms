@@ -6,6 +6,7 @@
                 #:condition-wait
                 #:current-thread
                 #:destroy-thread
+                #:interrupt-thread
                 #:join-thread
                 #:make-condition-variable
                 #:make-lock

@@ -618,22 +618,27 @@ A decoded null identifier is NIL."
   "Read messages until the channel ends or fails, then close the connection."
   (let ((reason nil))
     (handler-case
-        (loop
-         (let ((text (handler-case
-                         (channel-read-message (acp-connection-channel connection))
-                       (acp-message-too-large (condition)
-                         (connection--respond connection nil nil
-                                              :error-object (connection--error-object
-                                                             -32700
-                                                             (acp-error-message condition)))
-                         ':skipped))))
-           (cond
-             ((eq text ':skipped)
-              nil)
-             ((null text)
-              (return))
-             (t
-              (connection--dispatch connection text)))))
+        (loop while (connection-open-p connection)
+              do (let ((text
+                         (handler-case
+                             (restart-case
+                                 (channel-read-message (acp-connection-channel connection))
+                               (connection-stop-reading ()
+                                 :report "Stop reading from the closed ACP connection."
+                                 nil))
+                           (acp-message-too-large (condition)
+                             (connection--respond connection nil nil
+                                                  :error-object (connection--error-object
+                                                                 -32700
+                                                                 (acp-error-message condition)))
+                             ':skipped))))
+                   (cond
+                     ((eq text ':skipped)
+                      nil)
+                     ((null text)
+                      (return))
+                     (t
+                      (connection--dispatch connection text)))))
       (error (condition)
         (setf reason (format nil "The reader failed: ~A" condition))))
     (connection-close connection :reason reason))
@@ -646,9 +651,10 @@ A decoded null identifier is NIL."
 
 
 (defun connection--join-reader (connection)
-  "Wait up to *ACP-CLOSE-JOIN-SECONDS* for the reader thread, destroying a stuck one.
+  "Wake a blocked channel read, then join within *ACP-CLOSE-JOIN-SECONDS*.
 
-Return true when the reader has ended."
+Interrupt only the read restart, never notification dispatch or application hooks.
+Destroy a reader that outlives the deadline. Return true when it has ended."
   (let ((thread (acp-connection-reader-thread connection)))
     (cond
       ((or (null thread) (eq thread (current-thread)))
@@ -656,6 +662,14 @@ Return true when the reader has ended."
       (t
        (let ((deadline (+ (get-internal-real-time)
                           (* *acp-close-join-seconds* internal-time-units-per-second))))
+          ;; Closing a descriptor in another thread need not wake its blocked read.
+          (when (thread-alive-p thread)
+            (ignore-errors
+              (interrupt-thread
+               thread
+               (lambda ()
+                 (let ((restart (find-restart 'connection-stop-reading)))
+                   (when restart (invoke-restart restart)))))))
          (loop while (and (thread-alive-p thread)
                           (< (get-internal-real-time) deadline))
                do (sleep 0.01))
