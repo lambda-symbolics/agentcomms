@@ -227,6 +227,7 @@
         (call-next-method))
       (call-next-method)))
 
+(-> release-admission-gate (admission-gate-agent) null)
 (defun release-admission-gate (agent)
   "Release AGENT's prompt dispatch gate."
   (with-lock-held ((admission-gate-lock agent))
