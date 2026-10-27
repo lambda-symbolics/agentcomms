@@ -597,10 +597,10 @@ value, and the whole result."
   (client-agent-request client (acp-method-name ':session-set-mode)
                         (json-object "sessionId" session-id "modeId" mode-id "_meta" meta)))
 
-(-> client-set-config-option (acp-client string string t &key (:meta t)) list)
+(-> client-set-config-option (acp-client string string &key (:value t) (:meta t)) list)
 
 
-(defun client-set-config-option (client session-id config-id value &key meta)
+(defun client-set-config-option (client session-id config-id &key value meta)
   "Set CONFIG-ID of SESSION-ID to VALUE, a string or a boolean; return all options."
   (client--require-initialized client)
   (let ((result (client-agent-request

@@ -298,7 +298,7 @@
            (test-equal -32603
                        (acp-method-error-code
                         (test-signals acp-remote-error
-                          (client-set-config-option client "sess-1" "mode" "code"))))
+                          (client-set-config-option client "sess-1" "mode" :value "code"))))
            (test-equal -32603
                        (acp-method-error-code
                         (test-signals acp-remote-error
