@@ -136,6 +136,7 @@
     (test-equal "hint" (json-get (json-get (acp-available-command "web" "Search" :hint "hint") "input") "hint"))
     (test-equal "code" (json-get (acp-update-current-mode "code") "currentModeId"))
     (test-equal "mode" (json-get (acp-config-option-select "mode" "Mode" "ask"
+                                                           :options
                                                            (list (acp-config-select-option "ask" "Ask"))
                                                            :category ':mode)
                                  "category"))

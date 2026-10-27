@@ -744,12 +744,12 @@ ARGUMENTS extend the agent's launch arguments and ENVIRONMENT is a list of
   (json-object "group" group "name" name "options" (coerce options 'vector) "_meta" meta))
 
 (-> acp-config-option-select
-    (string string string list &key (:description (or null string))
+    (string string string &key (:options list) (:description (or null string))
             (:category (or null keyword string)) (:meta t))
     hash-table)
 
 
-(defun acp-config-option-select (id name current-value options &key description category meta)
+(defun acp-config-option-select (id name current-value &key options description category meta)
   "Return a select configuration option whose CURRENT-VALUE is among OPTIONS.
 
 CATEGORY is an enumeration keyword or a custom string beginning with an
