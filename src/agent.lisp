@@ -172,7 +172,7 @@ Return NIL or a JSON object of response extras."))
 (defgeneric agent-close-session (agent session-id params)
   (:documentation "Cancel SESSION-ID's work and release its resources."))
 
-(defgeneric agent-prompt (agent session-id prompt params)
+(defgeneric agent-prompt (agent session-id prompt &key params)
   (:documentation
    "Run one prompt turn for SESSION-ID over the content blocks PROMPT.
 
@@ -186,10 +186,10 @@ points, and return a stop reason keyword such as :END-TURN."))
 The library has already marked the session cancelled; specialize this to
 interrupt provider requests or tool executions."))
 
-(defgeneric agent-set-mode (agent session-id mode-id params)
+(defgeneric agent-set-mode (agent session-id mode-id &key params)
   (:documentation "Switch SESSION-ID to MODE-ID."))
 
-(defgeneric agent-set-config-option (agent session-id config-id value params)
+(defgeneric agent-set-config-option (agent session-id config-id &key value params)
   (:documentation
    "Set configuration option CONFIG-ID of SESSION-ID to VALUE.
 
@@ -276,7 +276,7 @@ Return a second value naming the next page cursor when more sessions exist."))
   (declare (ignore session-id params))
   nil)
 
-(defmethod agent-prompt ((agent acp-agent) session-id prompt params)
+(defmethod agent-prompt ((agent acp-agent) session-id prompt &key params)
   "Signal that prompting is unimplemented."
   (declare (ignore session-id prompt params))
   (agent--unimplemented "session/prompt"))
@@ -286,12 +286,12 @@ Return a second value naming the next page cursor when more sessions exist."))
   (declare (ignore session-id))
   nil)
 
-(defmethod agent-set-mode ((agent acp-agent) session-id mode-id params)
+(defmethod agent-set-mode ((agent acp-agent) session-id mode-id &key params)
   "Signal that modes are unimplemented."
   (declare (ignore session-id mode-id params))
   (agent--unimplemented "session/set_mode"))
 
-(defmethod agent-set-config-option ((agent acp-agent) session-id config-id value params)
+(defmethod agent-set-config-option ((agent acp-agent) session-id config-id &key value params)
   "Signal that configuration options are unimplemented."
   (declare (ignore session-id config-id value params))
   (agent--unimplemented "session/set_config_option"))
@@ -479,10 +479,10 @@ Return a second value naming the next page cursor when more sessions exist."))
           do (setf (gethash key object) value))
     object))
 
-(-> agent--run-prompt (acp-agent acp-agent-session list hash-table) hash-table)
+(-> agent--run-prompt (acp-agent acp-agent-session list &key (:params hash-table)) hash-table)
 
 
-(defun agent--run-prompt (agent session prompt params)
+(defun agent--run-prompt (agent session prompt &key params)
   "Run one prompt and atomically publish its cancellation outcome."
   (let ((session-id (acp-agent-session-identifier session)) (finished-p nil))
     (with-lock-held ((acp-agent-session-control-lock session))
@@ -497,7 +497,7 @@ Return a second value naming the next page cursor when more sessions exist."))
                 (if (or (agent-session-cancelled-p agent session-id)
                         (acp-request-cancelled-p))
                     ':cancelled
-                    (handler-case (agent-prompt agent session-id prompt params)
+                    (handler-case (agent-prompt agent session-id prompt :params params)
                       (acp-prompt-cancelled () ':cancelled)
                       (acp-request-cancelled () ':cancelled)
                       (error (condition)
@@ -646,12 +646,12 @@ Return a second value naming the next page cursor when more sessions exist."))
                 (prompt
                  (acp-validate-content-blocks
                   (acp-field params "prompt" :type ':array :required-p t))))
-           (agent--run-prompt agent session prompt params)))
+           (agent--run-prompt agent session prompt :params params)))
         (:session-set-mode
          (let ((session-id (acp-field params "sessionId" :type ':string :required-p t))
                (mode-id (acp-field params "modeId" :type ':string :required-p t)))
            (agent--known-session agent session-id)
-           (agent-set-mode agent session-id mode-id params)
+           (agent-set-mode agent session-id mode-id :params params)
            (json-object)))
         (:session-set-config-option
          (let ((session-id (acp-field params "sessionId" :type ':string :required-p t))
@@ -659,7 +659,8 @@ Return a second value naming the next page cursor when more sessions exist."))
            (agent--known-session agent session-id)
            (let ((options
                   (agent-set-config-option agent session-id config-id
-                                           (agent--config-option-value params) params)))
+                                           :value  (agent--config-option-value params)
+                                           :params params)))
              (json-object "configOptions" (coerce options 'vector)))))
         (:session-list
          (agent--require-capability agent "sessionCapabilities.list" method)

@@ -79,7 +79,7 @@
       params
       (call-next-method)))
 
-(defmethod agent-prompt ((agent test-agent) session-id prompt params)
+(defmethod agent-prompt ((agent test-agent) session-id prompt &key params)
   "Act on the first text block of PROMPT."
   (declare (ignore params))
   (let ((text (acp-content-text (first prompt))))

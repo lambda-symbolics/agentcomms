@@ -12,8 +12,9 @@
         (acp-terminal-auth-method "terminal-login" "Log in from a terminal"
                                   :arguments '("--login"))))
 
-(defmethod agent-prompt ((agent test-tooling-agent) session-id prompt params)
+(defmethod agent-prompt ((agent test-tooling-agent) session-id prompt &key params)
   "Exercise terminals, file writes, and elicitation on request."
+  (declare (ignore params))
   (let ((text (acp-content-text (first prompt))))
     (flet ((say (string)
              (agent-send-update agent session-id

@@ -78,7 +78,7 @@ serve standard I/O:
           (acp:json-object "modes" (acp:acp-session-mode-state
                                     "code" (list (acp:acp-session-mode "code" "Code"))))))
 
-(defmethod acp:agent-prompt ((agent my-agent) session-id prompt params)
+(defmethod acp:agent-prompt ((agent my-agent) session-id prompt &key params)
   (declare (ignore params))
   (dolist (block prompt)
     (acp:agent-check-cancelled agent session-id)

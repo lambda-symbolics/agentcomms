@@ -136,7 +136,7 @@
       (test-equal -32001
                   (acp-method-error-code
                    (test-signals acp-method-error
-                                 (agent--run-prompt agent session (list (acp-text-content "unused")) (json-object)))))
+                                 (agent--run-prompt agent session (list (acp-text-content "unused")) :params (json-object)))))
       (test-assert (acp-agent-session-prompt-active-p session))
       (test-assert (null (test-agent-prompts agent)))))
 
@@ -180,7 +180,7 @@
     :documentation "Whether the agent closed a session."))
   (:documentation "A test agent that holds each prompt until the test releases it."))
 
-(defmethod agent-prompt ((agent lifecycle-test-agent) session-id prompt params)
+(defmethod agent-prompt ((agent lifecycle-test-agent) session-id prompt &key params)
   "Hold the prompt until the test releases AGENT's gate, then end the turn."
   (declare (ignore session-id prompt params))
   (with-lock-held ((lifecycle-test-lock agent))
@@ -202,7 +202,7 @@
            (outcome nil)
            (prompt-thread (make-thread
                            (lambda ()
-                             (setf outcome (agent--run-prompt agent session nil (json-object))))))
+                             (setf outcome (agent--run-prompt agent session nil :params (json-object))))))
            (close-thread nil))
       (unwind-protect
            (progn
