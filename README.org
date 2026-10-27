@@ -223,6 +223,20 @@ Parse Error.
 The protocol types follow the upstream schema at
 =*ACP-SCHEMA-REFERENCE*=.
 
+* Development
+
+#+begin_src sh
+./script/bootstrap
+./script/check
+./script/check --fix
+#+end_src
+
+=./script/check= runs the tests, then checks the source with
+[[https://github.com/lambda-symbolics/cheque][cheque]] as =cheque.sexp=
+configures it. =--fix= skips the tests and repairs what cheque can repair.
+cheque and its tools are development dependencies: =checks/qlfile= lists them,
+and the check installs them on first use into =~/.cache/cheque/tools/=.
+
 * License
 
 COLL-Attribution, copyright 2026 Lambda Symbolics OÜ. See =LICENSE.lisp=.
