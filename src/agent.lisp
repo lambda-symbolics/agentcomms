@@ -580,7 +580,7 @@ Return a second value naming the next page cursor when more sessions exist."))
       (t
        (acp-invalid-params "The value must be a string or a boolean.")))))
 
-(defmethod peer-handle-request :around ((agent acp-agent) connection method params)
+(defmethod peer-handle-request :around ((agent acp-agent) connection method &key params)
   "Serialize setup callbacks and reject already-open session identifiers first."
   (declare (ignore connection))
   (if (member (acp-method-keyword method) '(:session-new :session-load :session-resume))
@@ -593,7 +593,7 @@ Return a second value naming the next page cursor when more sessions exist."))
         (call-next-method))
       (call-next-method)))
 
-(defmethod peer-handle-request ((agent acp-agent) connection method params)
+(defmethod peer-handle-request ((agent acp-agent) connection method &key params)
   "Dispatch an ACP request to the agent's generic functions."
   (declare (ignore connection))
   (let ((keyword (acp-method-keyword method)))
@@ -683,7 +683,7 @@ Return a second value naming the next page cursor when more sessions exist."))
              (call-next-method)))
         (t (call-next-method))))))
 
-(defmethod peer-handle-notification ((agent acp-agent) connection method params)
+(defmethod peer-handle-notification ((agent acp-agent) connection method &key params)
   "Handle session/cancel and extension notifications."
   (declare (ignore connection))
   (let ((keyword (acp-method-keyword method)))

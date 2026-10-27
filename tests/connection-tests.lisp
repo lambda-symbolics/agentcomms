@@ -25,7 +25,7 @@
     :documentation "The lock guarding the recorded notifications."))
   (:documentation "A peer with echo, failure, and cancellation-aware methods."))
 
-(defmethod peer-handle-request ((peer test-echo-peer) connection method params)
+(defmethod peer-handle-request ((peer test-echo-peer) connection method &key params)
   "Serve the scripted test methods."
   (declare (ignore connection))
   (cond
@@ -51,7 +51,7 @@
     (t
      (call-next-method))))
 
-(defmethod peer-handle-notification ((peer test-echo-peer) connection method params)
+(defmethod peer-handle-notification ((peer test-echo-peer) connection method &key params)
   "Record every notification."
   (declare (ignore connection))
   (with-lock-held ((test-echo-peer-lock peer))

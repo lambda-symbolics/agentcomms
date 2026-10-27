@@ -253,7 +253,7 @@ accepted form, the content object."))
   (json-object "exitCode" (or exit-code ':null)
                "signal" (or signal ':null)))
 
-(defmethod peer-handle-request ((client acp-client) connection method params)
+(defmethod peer-handle-request ((client acp-client) connection method &key params)
   "Dispatch an agent request to the client's generic functions."
   (declare (ignore connection))
   (unless (or (json-object-p params) (null params))
@@ -354,7 +354,7 @@ accepted form, the content object."))
          (call-next-method))))))
 
 
-(defmethod peer-handle-notification ((client acp-client) connection method params)
+(defmethod peer-handle-notification ((client acp-client) connection method &key params)
   "Deliver session updates, elicitation completions, and extension notifications."
   (declare (ignore connection))
   (let ((keyword (acp-method-keyword method)))

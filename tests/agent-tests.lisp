@@ -145,7 +145,7 @@
     :documentation "The lock guarding the records."))
   (:documentation "A raw client peer answering permission and file requests."))
 
-(defmethod peer-handle-notification ((peer test-client-peer) connection method params)
+(defmethod peer-handle-notification ((peer test-client-peer) connection method &key params)
   "Record session updates."
   (declare (ignore connection))
   (when (string= method "session/update")
@@ -154,7 +154,7 @@
             (nconc (test-client-peer-updates peer) (list params)))))
   nil)
 
-(defmethod peer-handle-request ((peer test-client-peer) connection method params)
+(defmethod peer-handle-request ((peer test-client-peer) connection method &key params)
   "Allow the first permission option and serve one fixed file."
   (declare (ignore connection))
   (cond
@@ -214,8 +214,9 @@
     :documentation "Whether the prompt dispatch gate is released."))
   (:documentation "A test agent that pauses prompt dispatch before admission."))
 
-(defmethod peer-handle-request ((agent admission-gate-agent) connection method params)
+(defmethod peer-handle-request ((agent admission-gate-agent) connection method &key params)
   "Pause a prompt request before AGENT--RUN-PROMPT and then dispatch it."
+  (declare (ignore params))
   (if (string= method "session/prompt")
       (progn
         (with-lock-held ((admission-gate-lock agent))

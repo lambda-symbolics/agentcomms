@@ -257,7 +257,7 @@
   (:documentation "A peer whose notification callback spans a concurrent close."))
 
 (defmethod peer-handle-notification
-    ((peer lifecycle-test-notification-peer) connection method params)
+    ((peer lifecycle-test-notification-peer) connection method &key params)
   "Finish an admitted notification even when another thread closes the connection."
   (declare (ignore method params))
   (with-lock-held ((test-echo-peer-lock peer))

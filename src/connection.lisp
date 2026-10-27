@@ -29,7 +29,7 @@ The agent and client roles are peers. Subclasses specialize the generic
 functions below, each of which runs with *ACP-INBOUND-REQUEST* bound while
 a request is in progress."))
 
-(defgeneric peer-handle-request (peer connection method params)
+(defgeneric peer-handle-request (peer connection method &key params)
   (:documentation
    "Return the JSON result for METHOD called with PARAMS by the peer.
 
@@ -37,20 +37,20 @@ Signal ACP-METHOD-ERROR to answer with a specific JSON-RPC error. Any
 other error becomes an Internal Error response. A NIL result is sent as
 an empty object."))
 
-(defgeneric peer-handle-notification (peer connection method params)
+(defgeneric peer-handle-notification (peer connection method &key params)
   (:documentation "React to notification METHOD with PARAMS. Errors are logged, not sent."))
 
 (defgeneric peer-connection-closed (peer connection reason)
   (:documentation "Observe CONNECTION closing for REASON, a string or NIL for a clean end."))
 
-(defmethod peer-handle-request ((peer acp-peer) connection method params)
+(defmethod peer-handle-request ((peer acp-peer) connection method &key params)
   "Answer every method with Method Not Found."
   (declare (ignore connection params))
   (error 'acp-method-error
          :code -32601
          :message (format nil "Method not found: ~A" method)))
 
-(defmethod peer-handle-notification ((peer acp-peer) connection method params)
+(defmethod peer-handle-notification ((peer acp-peer) connection method &key params)
   "Ignore unrecognized notifications, as the protocol requires."
   (declare (ignore connection method params))
   nil)
@@ -498,7 +498,7 @@ A decoded null identifier is NIL."
                     (progn
                       (acp-check-cancelled)
                       (peer-handle-request (acp-connection-peer connection) connection
-                                           (acp-inbound-request-method request) params))))
+                                           (acp-inbound-request-method request) :params params))))
                (connection--respond connection identifier result))
            (acp-method-error (condition)
              (connection--respond connection identifier nil :error-object
@@ -562,7 +562,7 @@ A decoded null identifier is NIL."
           (connection--cancel-inbound connection params))
         (handler-case
             (peer-handle-notification (acp-connection-peer connection)
-                                      connection method params)
+                                      connection method :params params)
           (error (condition)
             (connection--log connection "Notification ~A failed: ~A" method condition)))))
   nil)
