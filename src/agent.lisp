@@ -768,11 +768,11 @@ Return a second value naming the next page cursor when more sessions exist."))
                        (agent--update-parameters session-id update meta)))
 
 (-> agent-request-permission
-    (acp-agent string hash-table list &key (:timeout (or null real)) (:meta t))
+    (acp-agent string hash-table &key (:options list) (:timeout (or null real)) (:meta t))
     (values keyword (or null string)))
 
 
-(defun agent-request-permission (agent session-id tool-call options &key (timeout nil timeout-p) meta)
+(defun agent-request-permission (agent session-id tool-call &key options (timeout nil timeout-p) meta)
   "Ask the client for permission to run TOOL-CALL, offering permission OPTIONS.
 
 Return the outcome keyword :SELECTED or :CANCELLED and the selected option
@@ -821,11 +821,12 @@ id. TOOL-CALL is a tool call or tool call update object."
       content)))
 
 
-(-> agent-write-text-file (acp-agent string string string) null)
+(-> agent-write-text-file (acp-agent string string &key (:content string)) null)
 
 
-(defun agent-write-text-file (agent session-id path content)
+(defun agent-write-text-file (agent session-id path &key content)
   "Write CONTENT to the text file at absolute PATH through the client."
+  (check-type content string)
   (acp-validate-absolute-path path)
   (agent--require-client-capability agent "fs.writeTextFile")
   (agent-client-request agent (acp-method-name ':fs-write-text-file)

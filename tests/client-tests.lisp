@@ -36,7 +36,7 @@
            (agent-release-terminal agent session-id terminal-id)
            ':end-turn))
         ((string= text "write")
-         (agent-write-text-file agent session-id "/w/out.txt" "written")
+         (agent-write-text-file agent session-id "/w/out.txt" :content "written")
          ':end-turn)
         ((string= text "elicit")
          (multiple-value-bind (action content)

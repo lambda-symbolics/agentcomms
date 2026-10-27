@@ -94,6 +94,7 @@
        (multiple-value-bind (outcome option-id)
            (agent-request-permission agent session-id
                                      (acp-tool-call-update "call-1")
+                                     :options
                                      (list (acp-permission-option "allow" "Allow" ':allow-once)
                                            (acp-permission-option "reject" "Reject" ':reject-once)))
          (agent-send-update agent session-id
