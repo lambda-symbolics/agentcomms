@@ -113,7 +113,7 @@ LIMIT signals ACP-MESSAGE-TOO-LARGE."
     (when (> (length text) limit)
       (error 'acp-message-too-large
              :message (format nil "The outgoing message exceeds ~D characters." limit)
-             :limit limit))
+             :limit   limit))
     text))
 
 (-> json-decode (string &key (:limit integer)) t)
@@ -126,7 +126,7 @@ the structural bounds signal ACP-PROTOCOL-ERROR."
   (when (> (length source) limit)
     (error 'acp-message-too-large
            :message (format nil "The incoming message exceeds ~D characters." limit)
-           :limit limit))
+           :limit   limit))
   (handler-case
       (argo:json-decode source :limits (json--limits))
     (json-error (condition)

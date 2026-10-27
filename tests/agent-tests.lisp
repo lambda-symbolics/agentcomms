@@ -4,19 +4,19 @@
 
 (defclass test-agent (acp-agent)
   ((prompts
-    :initform nil
-    :accessor test-agent-prompts
-    :type list
+    :initform      nil
+    :accessor      test-agent-prompts
+    :type          list
     :documentation "Prompt texts received, newest first.")
    (cancellations
-    :initform 0
-    :accessor test-agent-cancellations
-    :type (integer 0)
+    :initform      0
+    :accessor      test-agent-cancellations
+    :type          (integer 0)
     :documentation "How many times AGENT-CANCEL ran.")
    (closed-sessions
-    :initform nil
-    :accessor test-agent-closed-sessions
-    :type list
+    :initform      nil
+    :accessor      test-agent-closed-sessions
+    :type          list
     :documentation "Session ids closed through session/close."))
   (:documentation "An agent scripted by the text of each prompt."))
 
@@ -100,10 +100,10 @@
          (agent-send-update agent session-id
                             (acp-update-tool-call-progress
                              (acp-tool-call-update "call-1"
-                                                   :status (if (and (eq outcome ':selected)
-                                                                    (string= option-id "allow"))
-                                                               ':completed
-                                                               ':failed)
+                                                   :status     (if (and (eq outcome ':selected)
+                                                                        (string= option-id "allow"))
+                                                                   ':completed
+                                                                   ':failed)
                                                    :raw-output (json-object "outcome" (string-downcase
                                                                                         (symbol-name outcome)))))))
        ':end-turn)
@@ -130,19 +130,19 @@
 
 (defclass test-client-peer (acp-peer)
   ((updates
-    :initform nil
-    :accessor test-client-peer-updates
-    :type list
+    :initform      nil
+    :accessor      test-client-peer-updates
+    :type          list
     :documentation "session/update params received, oldest first.")
    (permission-requests
-    :initform nil
-    :accessor test-client-peer-permission-requests
-    :type list
+    :initform      nil
+    :accessor      test-client-peer-permission-requests
+    :type          list
     :documentation "session/request_permission params received, oldest first.")
    (lock
-    :initform (make-lock "agentcomms test client peer")
-    :reader test-client-peer-lock
-    :type t
+    :initform      (make-lock "agentcomms test client peer")
+    :reader        test-client-peer-lock
+    :type          t
     :documentation "The lock guarding the records."))
   (:documentation "A raw client peer answering permission and file requests."))
 
@@ -179,7 +179,7 @@
   (multiple-value-bind (left right)
       (make-acp-channel-pair)
     (let ((agent (make-instance 'test-agent))
-          (peer (make-instance 'test-client-peer)))
+          (peer  (make-instance 'test-client-peer)))
       (acp-agent-connect agent right :name "test agent")
       (let ((client (make-acp-connection :channel left :peer peer :name "raw client")))
         (connection-request client "initialize"
@@ -198,20 +198,20 @@
 ;;;; -- Agent Tests --
 (defclass admission-gate-agent (test-agent)
   ((lock
-    :initform (make-lock "admission gate")
-    :reader admission-gate-lock
+    :initform      (make-lock "admission gate")
+    :reader        admission-gate-lock
     :documentation "The lock guarding the admission gate.")
    (condition
-    :initform (make-condition-variable)
-    :reader admission-gate-condition
+    :initform      (make-condition-variable)
+    :reader        admission-gate-condition
     :documentation "The condition used to release the admission gate.")
    (entered-p
-    :initform nil
-    :accessor admission-gate-entered-p
+    :initform      nil
+    :accessor      admission-gate-entered-p
     :documentation "Whether prompt dispatch reached the gate.")
    (release-p
-    :initform nil
-    :accessor admission-gate-release-p
+    :initform      nil
+    :accessor      admission-gate-release-p
     :documentation "Whether the prompt dispatch gate is released."))
   (:documentation "A test agent that pauses prompt dispatch before admission."))
 
@@ -256,8 +256,8 @@
 
 (define-test agent-cancelled-request-waiting-for-admission-skips-prompt
   (multiple-value-bind (left right) (make-acp-channel-pair)
-    (let* ((agent (make-instance 'admission-gate-agent))
-           (peer (make-instance 'test-client-peer))
+    (let* ((agent  (make-instance 'admission-gate-agent))
+           (peer   (make-instance 'test-client-peer))
            (client nil)
            (result nil)
            (thread nil))
@@ -290,11 +290,11 @@
              (test-assert
               (test-wait-until
                (lambda ()
-                 (loop for request being the hash-values of (acp-connection-inbound
-                                              (acp-agent-connection agent))
-                             thereis (and (string= "session/prompt"
-                                                 (acp-inbound-request-method request))
-                                         (acp-inbound-request-cancelled-p request)))))
+                 (loop for request being the hash-values
+                         of (acp-connection-inbound (acp-agent-connection agent))
+                       thereis (and (string= "session/prompt"
+                                             (acp-inbound-request-method request))
+                                    (acp-inbound-request-cancelled-p request)))))
               "wire cancellation reaches the waiting request")
              (release-admission-gate agent)
              (join-thread thread)
@@ -307,7 +307,7 @@
 (define-test agent-initialization-and-gating
   (multiple-value-bind (left right)
       (make-acp-channel-pair)
-    (let* ((agent (make-instance 'test-agent))
+    (let* ((agent  (make-instance 'test-agent))
            (client (make-acp-connection :channel left :peer (make-instance 'test-client-peer))))
       (acp-agent-connect agent right)
       (unwind-protect

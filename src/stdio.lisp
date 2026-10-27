@@ -19,16 +19,16 @@
 An agent launched by an editor serves its connection over this channel.
 Nothing else may write to standard output while it is in use."
   (make-acp-stream-channel
-   :input #+sbcl (sb-sys:make-fd-stream (sb-sys:fd-stream-fd sb-sys:*stdin*) :input t
-                                          :external-format ':utf-8
-                                          :buffering ':full
-                                          :element-type 'character)
+   :input                      #+sbcl (sb-sys:make-fd-stream (sb-sys:fd-stream-fd sb-sys:*stdin*) :input t
+                                                               :external-format ':utf-8
+                                                               :buffering ':full
+                                                               :element-type 'character)
           #+ccl (ccl::make-fd-stream 0 :direction ':input :encoding ':utf-8 :sharing ':lock)
           #-(or sbcl ccl) *standard-input*
-   :output #+sbcl (sb-sys:make-fd-stream (sb-sys:fd-stream-fd sb-sys:*stdout*) :output t
-                                           :external-format ':utf-8
-                                           :buffering ':full
-                                           :element-type 'character)
+   :output                     #+sbcl (sb-sys:make-fd-stream (sb-sys:fd-stream-fd sb-sys:*stdout*) :output t
+                                                               :external-format ':utf-8
+                                                               :buffering ':full
+                                                               :element-type 'character)
            #+ccl (ccl::make-fd-stream 1 :direction ':output :encoding ':utf-8 :sharing ':lock)
            #-(or sbcl ccl) *standard-output*
    :maximum-message-characters maximum-message-characters))
@@ -50,40 +50,40 @@ Nothing else may write to standard output while it is in use."
 
 (defclass acp-process-channel (acp-stream-channel)
   ((process
-    :initarg :process
-    :reader acp-process-channel-process
-    :type t
+    :initarg       :process
+    :reader        acp-process-channel-process
+    :type          t
     :documentation "The UIOP process information of the agent subprocess.")
    (command
-    :initarg :command
-    :reader acp-process-channel-command
-    :type list
+    :initarg       :command
+    :reader        acp-process-channel-command
+    :type          list
     :documentation "The command line that started the agent.")
    (stderr-thread
-    :initform nil
-    :accessor acp-process-channel-stderr-thread
-    :type t
+    :initform      nil
+    :accessor      acp-process-channel-stderr-thread
+    :type          t
     :documentation "The thread draining the agent's standard error.")
    (stderr-text
-    :initform (make-array 0 :element-type 'character :adjustable t :fill-pointer 0)
-    :reader acp-process-channel--stderr-buffer
-    :type string
+    :initform      (make-array 0 :element-type 'character :adjustable t :fill-pointer 0)
+    :reader        acp-process-channel--stderr-buffer
+    :type          string
     :documentation "The retained tail of the agent's standard error.")
    (stderr-limit
-    :initarg :stderr-limit
-    :initform *acp-process-stderr-limit*
-    :reader acp-process-channel-stderr-limit
-    :type integer
+    :initarg       :stderr-limit
+    :initform      *acp-process-stderr-limit*
+    :reader        acp-process-channel-stderr-limit
+    :type          integer
     :documentation "The most standard error characters retained.")
    (stderr-lock
-    :initform (make-lock "agentcomms process stderr")
-    :reader acp-process-channel-stderr-lock
-    :type t
+    :initform      (make-lock "agentcomms process stderr")
+    :reader        acp-process-channel-stderr-lock
+    :type          t
     :documentation "The lock guarding the standard error buffer.")
    (exit-code
-    :initform nil
-    :accessor acp-process-channel-exit-code
-    :type (or null integer)
+    :initform      nil
+    :accessor      acp-process-channel-exit-code
+    :type          (or null integer)
     :documentation "The exit code once the process has been reaped."))
   (:documentation
    "A channel to an agent running as a subprocess of this client.
@@ -108,7 +108,7 @@ when it does not."))
   "Append TEXT to the standard error buffer, dropping the oldest excess."
   (with-lock-held ((acp-process-channel-stderr-lock channel))
     (let ((buffer (acp-process-channel--stderr-buffer channel))
-          (limit (acp-process-channel-stderr-limit channel)))
+          (limit  (acp-process-channel-stderr-limit channel)))
       (loop for character across text
             do (vector-push-extend character buffer))
       (when (> (length buffer) limit)
@@ -180,10 +180,10 @@ with ACP-CLIENT-CONNECT and close the connection to stop the agent."
   (let ((process (handler-case
                      (apply #'uiop:launch-program
                             (cons command arguments)
-                            :input ':stream
-                            :output ':stream
-                            :error-output ':stream
-                            :external-format ':utf-8
+                            :input               ':stream
+                            :output              ':stream
+                            :error-output        ':stream
+                            :external-format     ':utf-8
                             :ignore-error-status t
                             (append (when directory
                                       (list :directory directory))
@@ -194,11 +194,11 @@ with ACP-CLIENT-CONNECT and close the connection to stop the agent."
                             :message (format nil "Could not start the agent ~S: ~A"
                                              command cause))))))
     (let ((channel (make-instance 'acp-process-channel
-                                  :process process
-                                  :command (cons command arguments)
-                                  :input (uiop:process-info-output process)
-                                  :output (uiop:process-info-input process)
-                                  :stderr-limit stderr-limit
+                                  :process                    process
+                                  :command                    (cons command arguments)
+                                  :input                      (uiop:process-info-output process)
+                                  :output                     (uiop:process-info-input process)
+                                  :stderr-limit               stderr-limit
                                   :maximum-message-characters maximum-message-characters)))
       (setf (slot-value channel 'close-function)
             (lambda ()

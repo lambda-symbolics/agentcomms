@@ -25,7 +25,7 @@
 
 (define-test stdio-subprocess-agent-round-trip
   (let ((channel (test-launch-echo-agent))
-        (client (make-instance 'test-client)))
+        (client  (make-instance 'test-client)))
     (acp-client-connect client channel :name "subprocess client" :request-timeout 60)
     (unwind-protect
          (progn
@@ -44,7 +44,7 @@
                            (search "echo-agent ready" (acp-process-channel-stderr-text channel))))
                         "standard error is captured")
            (test-assert (acp-process-channel-alive-p channel)))
-      (let ((start (get-internal-real-time))
+      (let ((start      (get-internal-real-time))
             (connection (acp-client-connection client)))
         (connection-close connection)
         (test-assert (< (/ (- (get-internal-real-time) start)
@@ -62,7 +62,6 @@
     (test-assert (channel-open-p channel))
     (test-equal *acp-maximum-message-characters* (channel-maximum-message-characters channel))))
 
-
 #+sbcl
 (define-test stdio-native-standard-handles
   (uiop:with-temporary-file (:stream input :direction ':io :element-type 'character
@@ -72,8 +71,8 @@
       (write-line "native input ∑" input)
       (finish-output input)
       (file-position input 0)
-      (let ((sb-sys:*stdin* input)
-            (sb-sys:*stdout* output)
+      (let ((sb-sys:*stdin*    input)
+            (sb-sys:*stdout*   output)
             (*standard-output* (make-string-output-stream)))
         (let ((channel (acp-standard-io-channel)))
           (test-equal "native input ∑" (channel-read-message channel))
@@ -82,21 +81,21 @@
           (test-equal "native output ∑" (read-line output)))))))
 
 (define-test stream-channel-concurrent-close-waits-for-cleanup
-  (let* ((lock (make-lock "channel close test"))
-         (condition (make-condition-variable))
+  (let* ((lock              (make-lock "channel close test"))
+         (condition         (make-condition-variable))
          (release-condition (make-condition-variable))
-         (entered-p nil)
-         (released-p nil)
-         (completed-p nil)
-         (observed-p nil)
-         (second-started-p nil)
-         (calls 0)
-         (channel nil)
-         (first-thread nil)
-         (second-thread nil))
+         (entered-p         nil)
+         (released-p        nil)
+         (completed-p       nil)
+         (observed-p        nil)
+         (second-started-p  nil)
+         (calls             0)
+         (channel           nil)
+         (first-thread      nil)
+         (second-thread     nil))
     (setf channel
           (make-acp-stream-channel
-           :input (make-string-input-stream "")
+           :input  (make-string-input-stream "")
            :output (make-string-output-stream)
            :close-function
            (lambda ()

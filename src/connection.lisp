@@ -47,7 +47,7 @@ an empty object."))
   "Answer every method with Method Not Found."
   (declare (ignore connection params))
   (error 'acp-method-error
-         :code -32601
+         :code    -32601
          :message (format nil "Method not found: ~A" method)))
 
 (defmethod peer-handle-notification ((peer acp-peer) connection method &key params)
@@ -65,132 +65,132 @@ an empty object."))
 
 (defclass acp-pending-request ()
   ((identifier
-    :initarg :identifier
-    :reader acp-pending-request-identifier
-    :type integer
+    :initarg       :identifier
+    :reader        acp-pending-request-identifier
+    :type          integer
     :documentation "The JSON-RPC id of the outgoing request.")
    (method
-    :initarg :method
-    :reader acp-pending-request-method
-    :type string
+    :initarg       :method
+    :reader        acp-pending-request-method
+    :type          string
     :documentation "The requested method, for diagnostics.")
    (result
-    :initform nil
-    :accessor acp-pending-request-result
-    :type t
+    :initform      nil
+    :accessor      acp-pending-request-result
+    :type          t
     :documentation "The result value once a successful response arrives.")
    (failure
-    :initform nil
-    :accessor acp-pending-request-failure
-    :type (or null condition)
+    :initform      nil
+    :accessor      acp-pending-request-failure
+    :type          (or null condition)
     :documentation "The condition to signal to the waiter, when the request failed.")
    (done-p
-    :initform nil
-    :accessor acp-pending-request-done-p
-    :type boolean
+    :initform      nil
+    :accessor      acp-pending-request-done-p
+    :type          boolean
     :documentation "Whether a response or failure has been recorded.")
    (condition
-    :initform (make-condition-variable :name "agentcomms request response")
-    :reader acp-pending-request-condition
-    :type t
+    :initform      (make-condition-variable :name "agentcomms request response")
+    :reader        acp-pending-request-condition
+    :type          t
     :documentation "The condition variable waking this request's waiter."))
   (:documentation "The waiting side of one outgoing request."))
 
-
 (defclass acp-inbound-request ()
   ((identifier
-    :initarg :identifier
-    :reader acp-inbound-request-identifier
-    :type t
+    :initarg       :identifier
+    :reader        acp-inbound-request-identifier
+    :type          t
     :documentation "The JSON-RPC id chosen by the peer.")
    (method
-    :initarg :method
-    :reader acp-inbound-request-method
-    :type string
+    :initarg       :method
+    :reader        acp-inbound-request-method
+    :type          string
     :documentation "The method being handled.")
    (cancelled-p
-    :initform nil
-    :accessor acp-inbound-request-cancelled-p
-    :type boolean
+    :initform      nil
+    :accessor      acp-inbound-request-cancelled-p
+    :type          boolean
     :documentation "Whether the peer cancelled this request.")
    (thread
-    :initform nil
-    :accessor acp-inbound-request-thread
-    :type t
+    :initform      nil
+    :accessor      acp-inbound-request-thread
+    :type          t
     :documentation "The owned handler thread, installed before admission completes."))
   (:documentation "One request from the peer that a handler thread is serving."))
+
 
 ;;;; -- Connection --
 
 (defclass acp-connection ()
   ((channel
-    :initarg :channel
-    :reader acp-connection-channel
-    :type acp-channel
+    :initarg       :channel
+    :reader        acp-connection-channel
+    :type          acp-channel
     :documentation "The channel carrying this connection's messages.")
    (peer
-    :initarg :peer
-    :reader acp-connection-peer
-    :type acp-peer
+    :initarg       :peer
+    :reader        acp-connection-peer
+    :type          acp-peer
     :documentation "The local party answering the remote side.")
    (name
-    :initarg :name
-    :initform "agentcomms"
-    :reader acp-connection-name
-    :type string
+    :initarg       :name
+    :initform      "agentcomms"
+    :reader        acp-connection-name
+    :type          string
     :documentation "A label used in thread names and diagnostics.")
    (request-timeout
-    :initarg :request-timeout
-    :initform *acp-default-request-timeout*
-    :accessor acp-connection-request-timeout
-    :type (or null real)
+    :initarg       :request-timeout
+    :initform      *acp-default-request-timeout*
+    :accessor      acp-connection-request-timeout
+    :type          (or null real)
     :documentation "The default response deadline for outgoing requests.")
    (log-function
-    :initarg :log-function
-    :initform nil
-    :accessor acp-connection-log-function
-    :type (or null function)
+    :initarg       :log-function
+    :initform      nil
+    :accessor      acp-connection-log-function
+    :type          (or null function)
     :documentation "An optional function receiving one diagnostic string per event.")
    (lock
-    :initform (make-lock "agentcomms connection")
-    :reader acp-connection-lock
-    :type t
+    :initform      (make-lock "agentcomms connection")
+    :reader        acp-connection-lock
+    :type          t
     :documentation "The lock guarding identifiers, tables, and the closed flag.")
    (next-identifier
-    :initform 0
-    :accessor acp-connection-next-identifier
-    :type integer
+    :initform      0
+    :accessor      acp-connection-next-identifier
+    :type          integer
     :documentation "The id of the next outgoing request.")
    (pending
-    :initform (make-hash-table :test #'eql)
-    :reader acp-connection-pending
-    :type hash-table
+    :initform      (make-hash-table :test #'eql)
+    :reader        acp-connection-pending
+    :type          hash-table
     :documentation "Outgoing requests awaiting responses, by id.")
    (inbound
-    :initform (make-hash-table :test #'equal)
-    :reader acp-connection-inbound
-    :type hash-table
+    :initform      (make-hash-table :test #'equal)
+    :reader        acp-connection-inbound
+    :type          hash-table
     :documentation "Peer requests being handled, by their id.")
    (reader-thread
-    :initform nil
-    :accessor acp-connection-reader-thread
-    :type t
+    :initform      nil
+    :accessor      acp-connection-reader-thread
+    :type          t
     :documentation "The thread reading and dispatching incoming messages.")
    (closed-p
-    :initform nil
-    :accessor acp-connection-closed-p
-    :type boolean
+    :initform      nil
+    :accessor      acp-connection-closed-p
+    :type          boolean
     :documentation "Whether the connection has closed.")
    (close-reason
-    :initform nil
-    :accessor acp-connection-close-reason
-    :type (or null string)
+    :initform      nil
+    :accessor      acp-connection-close-reason
+    :type          (or null string)
     :documentation "Why the connection closed, or NIL for a clean end.")
    (maximum-inbound-requests
-    :initarg :maximum-inbound-requests
-    :initform *acp-maximum-inbound-requests*
-    :reader acp-connection-maximum-inbound-requests
-    :type (integer 1)
+    :initarg       :maximum-inbound-requests
+    :initform      *acp-maximum-inbound-requests*
+    :reader        acp-connection-maximum-inbound-requests
+    :type          (integer 1)
     :documentation "The bounded number of owned inbound handler threads."))
   (:documentation
    "A symmetric JSON-RPC 2.0 connection over a message channel.
@@ -200,13 +200,11 @@ their own threads so a long request such as a prompt never blocks the
 notification that cancels it; incoming notifications run on the reader
 thread in arrival order."))
 
-
 (-> make-acp-connection
     (&key (:channel acp-channel) (:peer acp-peer) (:name string)
           (:request-timeout (or null real)) (:log-function (or null function))
           (:maximum-inbound-requests (integer 1)))
     acp-connection)
-
 (defun make-acp-connection
     (
      &key channel peer (name "agentcomms") (request-timeout *acp-default-request-timeout*)
@@ -228,8 +226,6 @@ server error -32001; responses and cancellation notifications continue."
     connection))
 
 (-> connection--log (acp-connection string &rest t) null)
-
-
 (defun connection--log (connection control &rest arguments)
   "Pass one formatted diagnostic to the connection's log function, if any."
   (let ((function (acp-connection-log-function connection)))
@@ -239,15 +235,11 @@ server error -32001; responses and cancellation notifications continue."
   nil)
 
 (-> connection-open-p (acp-connection) boolean)
-
-
 (defun connection-open-p (connection)
   "Return true while CONNECTION has not closed."
   (not (acp-connection-closed-p connection)))
 
 (-> connection-run (acp-connection) (or null string))
-
-
 (defun connection-run (connection)
   "Block until CONNECTION closes and return its close reason."
   (let ((thread (acp-connection-reader-thread connection)))
@@ -259,8 +251,6 @@ server error -32001; responses and cancellation notifications continue."
 ;;;; -- Outgoing Messages --
 
 (-> connection--write (acp-connection t) null)
-
-
 (defun connection--write (connection message)
   "Encode and send MESSAGE, closing the connection when the channel fails."
   (let ((text (json-encode message)))
@@ -281,8 +271,6 @@ server error -32001; responses and cancellation notifications continue."
   (json-object "jsonrpc" "2.0" "method" method "params" (or params (json-object))))
 
 (-> connection-notify (acp-connection string &optional t) null)
-
-
 (defun connection-notify (connection method &optional params)
   "Send notification METHOD with PARAMS, which defaults to an empty object."
   (when (acp-connection-closed-p connection)
@@ -290,8 +278,6 @@ server error -32001; responses and cancellation notifications continue."
   (connection--write connection (connection--notification-message method params)))
 
 (-> connection-cancel-request (acp-connection t) null)
-
-
 (defun connection-cancel-request (connection identifier)
   "Ask the peer to cancel the request it received under IDENTIFIER."
   (connection-notify connection
@@ -299,15 +285,11 @@ server error -32001; responses and cancellation notifications continue."
                      (json-object "requestId" identifier)))
 
 (-> connection--deadline-passed-p ((or null integer)) boolean)
-
-
 (defun connection--deadline-passed-p (deadline)
   "Return true when DEADLINE, in internal time units, has passed."
   (and deadline (>= (get-internal-real-time) deadline) t))
 
 (-> connection--await (acp-connection acp-pending-request (or null real)) t)
-
-
 (defun connection--await (connection pending timeout)
   "Wait for PENDING to complete within TIMEOUT seconds and return its result."
   (let ((deadline
@@ -334,12 +316,9 @@ server error -32001; responses and cancellation notifications continue."
             (condition-wait (acp-pending-request-condition pending) lock :timeout
                             (and remaining (max remaining 0.001))))))))))
 
-
 (-> connection-request
     (acp-connection string t &key (:timeout (or null real)) (:on-sent (or null function)))
     t)
-
-
 (defun connection-request
     (connection method params
      &key (timeout (acp-connection-request-timeout connection)) on-sent)
@@ -381,18 +360,15 @@ Every exit removes the pending request; an abandoned request is cancelled."
           (connection-cancel-request connection
                                      (acp-pending-request-identifier pending)))))))
 
+
 ;;;; -- Incoming Messages --
 
 (-> connection--error-object (integer string &optional t) hash-table)
-
-
 (defun connection--error-object (code message &optional data)
   "Return a JSON-RPC error object."
   (json-object "code" code "message" message "data" data))
 
 (-> connection--respond (acp-connection t t &key (:error-object t)) null)
-
-
 (defun connection--respond (connection identifier result &key error-object)
   "Send the response to the peer request IDENTIFIER, ignoring a closed channel.
 
@@ -410,18 +386,13 @@ A NIL IDENTIFIER, the decoded null identifier, is answered with a null id."
   nil)
 
 (-> connection--identifier-p (t) boolean)
-
-
 (defun connection--identifier-p (value)
   "Return whether VALUE is a JSON-RPC string, number, or null identifier.
 
 A decoded null identifier is NIL."
   (and (or (realp value) (stringp value) (null value)) t))
 
-
 (-> connection--complete-pending (acp-connection hash-table) null)
-
-
 (defun connection--complete-pending (connection message)
   "Resolve the pending request answered by response MESSAGE."
   (let ((identifier (json-get message "id")) (pending nil))
@@ -454,18 +425,13 @@ A decoded null identifier is NIL."
                        (bounded-diagnostic identifier))))
   nil)
 
-
 (-> acp-request-cancelled-p () boolean)
-
-
 (defun acp-request-cancelled-p ()
   "Return true when the peer cancelled the request the current thread is handling."
   (let ((request *acp-inbound-request*))
     (and request (acp-inbound-request-cancelled-p request) t)))
 
 (-> acp-check-cancelled () null)
-
-
 (defun acp-check-cancelled ()
   "Signal ACP-REQUEST-CANCELLED when the current request was cancelled."
   (when (acp-request-cancelled-p)
@@ -473,8 +439,6 @@ A decoded null identifier is NIL."
   nil)
 
 (-> connection--cancel-inbound (acp-connection hash-table) null)
-
-
 (defun connection--cancel-inbound (connection params)
   "Mark the inbound request named by cancellation PARAMS as cancelled."
   (let ((identifier (json-get params "requestId")))
@@ -486,12 +450,10 @@ A decoded null identifier is NIL."
   nil)
 
 (-> connection--serve-request (acp-connection acp-inbound-request t) null)
-
-
 (defun connection--serve-request (connection request params)
   "Handle inbound REQUEST with PARAMS on the current thread and respond."
   (let ((*acp-inbound-request* request)
-        (identifier (acp-inbound-request-identifier request)))
+        (identifier            (acp-inbound-request-identifier request)))
     (unwind-protect
          (handler-case
              (let ((result
@@ -518,41 +480,38 @@ A decoded null identifier is NIL."
         (remhash identifier (acp-connection-inbound connection)))))
   nil)
 
-
 (-> connection--dispatch-request (acp-connection hash-table) null)
-
-
 (defun connection--dispatch-request (connection message)
   "Admit and own an inbound handler, rejecting duplicates and overload."
   (let* ((identifier (json-get message "id"))
-         (method (json-get message "method"))
-         (params (json-get message "params"))
-         (request (make-instance 'acp-inbound-request :identifier identifier :method method))
-         (failure nil))
+         (method     (json-get message "method"))
+         (params     (json-get message "params"))
+         (request    (make-instance 'acp-inbound-request :identifier identifier :method method))
+         (failure    nil))
     (with-lock-held ((acp-connection-lock connection))
-      (cond ((acp-connection-closed-p connection) (return-from connection--dispatch-request nil))
+      (cond ((acp-connection-closed-p connection)
+             (return-from connection--dispatch-request nil))
             ((gethash identifier (acp-connection-inbound connection))
              (setf failure (connection--error-object -32600 "The request id is already active.")))
             ((>= (hash-table-count (acp-connection-inbound connection))
                  (acp-connection-maximum-inbound-requests connection))
              (setf failure
                    (connection--error-object -32001 "The inbound request limit is reached.")))
-            (t (setf (gethash identifier (acp-connection-inbound connection)) request)
-               (handler-case
-                   (setf (acp-inbound-request-thread request)
-                         (make-thread
-                          (lambda () (connection--serve-request connection request params)) :name
-                          (format nil "~A ~A" (acp-connection-name connection) method)))
-                 (error nil (remhash identifier (acp-connection-inbound connection))
-                        (setf failure
-                              (connection--error-object -32603
-                                                        "Cannot start an inbound handler.")))))))
+            (t
+             (setf (gethash identifier (acp-connection-inbound connection)) request)
+             (handler-case
+                 (setf (acp-inbound-request-thread request)
+                       (make-thread
+                        (lambda () (connection--serve-request connection request params)) :name
+                        (format nil "~A ~A" (acp-connection-name connection) method)))
+               (error nil (remhash identifier (acp-connection-inbound connection))
+                      (setf failure
+                            (connection--error-object -32603
+                                                      "Cannot start an inbound handler.")))))))
     (when failure (connection--respond connection identifier nil :error-object failure)))
   nil)
 
 (-> connection--dispatch-notification (acp-connection hash-table) null)
-
-
 (defun connection--dispatch-notification (connection message)
   "Handle the notification in MESSAGE on the reader thread."
   (let ((method (json-get message "method"))
@@ -568,8 +527,6 @@ A decoded null identifier is NIL."
   nil)
 
 (-> connection--dispatch (acp-connection string) null)
-
-
 (defun connection--dispatch (connection text)
   "Decode and route one message TEXT received from the peer."
   (let ((message
@@ -595,7 +552,8 @@ A decoded null identifier is NIL."
       ((stringp (json-get message "method"))
        (multiple-value-bind (identifier present-p)
            (gethash "id" message)
-         (cond ((not present-p) (connection--dispatch-notification connection message))
+         (cond ((not present-p)
+                (connection--dispatch-notification connection message))
                ((connection--identifier-p identifier)
                 (connection--dispatch-request connection message))
                (t
@@ -612,10 +570,7 @@ A decoded null identifier is NIL."
                                                       "The message is neither a request, a notification, nor a response.")))))
   nil)
 
-
 (-> connection--reader-loop (acp-connection) null)
-
-
 (defun connection--reader-loop (connection)
   "Read messages until the channel ends or fails, then close the connection."
   (let ((reason nil))
@@ -650,8 +605,6 @@ A decoded null identifier is NIL."
 ;;;; -- Closing --
 
 (-> connection--join-reader (acp-connection) boolean)
-
-
 (defun connection--join-reader (connection)
   "Wake a blocked channel read, then join within *ACP-CLOSE-JOIN-SECONDS*.
 
@@ -685,11 +638,7 @@ Destroy a reader that outlives the deadline. Return true when it has ended."
          (not (thread-alive-p thread)))))))
 
 (-> connection-close (acp-connection &key (:reason (or null string))) null)
-
-
 (-> connection--join-handlers (list) boolean)
-
-
 (defun connection--join-handlers (requests)
   "Cooperatively join REQUESTS within one shared close deadline.
 

@@ -5,7 +5,7 @@
 (define-test connection-accepts-json-rpc-identifiers
     (multiple-value-bind (server-channel client-channel) (make-acp-channel-pair)
       (let ((connection (make-acp-connection :channel server-channel
-                                             :peer (make-instance 'test-echo-peer))))
+                                             :peer    (make-instance 'test-echo-peer))))
         (unwind-protect
              (dolist (identifier '("named-request" 7 1.25 nil))
                (channel-write-message
@@ -56,7 +56,7 @@
                 (test-wait-until
                  (lambda () (= 1 (hash-table-count (acp-connection-inbound connection))))))
                (let* ((request (gethash 2 (acp-connection-inbound connection)))
-                      (thread (acp-inbound-request-thread request)))
+                      (thread  (acp-inbound-request-thread request)))
                  (connection-close connection)
                  (test-assert (acp-inbound-request-cancelled-p request))
                  (test-assert (not (thread-alive-p thread)))
@@ -67,8 +67,8 @@
 (define-test connection-wakes-the-correct-response-waiter
     (multiple-value-bind (server-channel raw-channel) (make-acp-channel-pair)
       (let ((connection (make-acp-connection :channel server-channel :peer (make-instance 'acp-peer)))
-            (threads nil)
-            (results (make-hash-table :test #'equal)))
+            (threads    nil)
+            (results    (make-hash-table :test #'equal)))
         (unwind-protect
              (progn
                (dolist (method '("first" "second"))
@@ -80,8 +80,8 @@
                                     (acp-connection-closed () :closed)))))
                          threads)))
                (let* ((requests (loop repeat 2 collect (json-decode (channel-read-message raw-channel))))
-                      (second (find "second" requests :key (lambda (message) (json-get message "method"))
-                                    :test #'equal)))
+                      (second   (find "second" requests :key (lambda (message) (json-get message "method"))
+                                      :test                  #'equal)))
                  (channel-write-message raw-channel
                                         (json-encode (json-object "jsonrpc" "2.0" "id" (json-get second "id") "result" "ready")))
                  (test-assert (test-wait-until (lambda () (gethash "second" results)) :seconds 1))
@@ -97,11 +97,11 @@
 (define-test connection-cleans-abandoned-outgoing-request
     (multiple-value-bind (server-channel raw-channel) (make-acp-channel-pair)
       (let* ((connection (make-acp-connection :channel server-channel :peer (make-instance 'acp-peer)))
-             (thread (make-thread (lambda ()
-                                    (catch 'abandon
-                                      (connection-request connection "pending" nil))))))
+             (thread     (make-thread (lambda ()
+                                        (catch 'abandon
+                                          (connection-request connection "pending" nil))))))
         (unwind-protect
-             (let* ((request (json-decode (channel-read-message raw-channel)))
+             (let* ((request    (json-decode (channel-read-message raw-channel)))
                     (identifier (json-get request "id")))
                (bordeaux-threads:interrupt-thread thread (lambda () (throw 'abandon nil)))
                (join-thread thread)
@@ -112,6 +112,7 @@
           (connection-close connection)
           (channel-close raw-channel)
           (join-thread thread)))))
+
 
 ;;;; -- ACP Path and Prompt Contracts --
 
@@ -130,7 +131,7 @@
                  (json-object "cwd" "/work" "mcpServers" #() "additionalDirectories" #("relative")))))
 
 (define-test agent-rejects-overlapping-prompts
-    (let* ((agent (make-instance 'test-agent))
+    (let* ((agent   (make-instance 'test-agent))
            (session (agent--register-session agent "session" "/work")))
       (setf (acp-agent-session-prompt-active-p session) t)
       (test-equal -32001
@@ -142,10 +143,10 @@
 
 (define-test agent-disconnect-marks-and-cancels-all-sessions
     (multiple-value-bind (channel remote) (make-acp-channel-pair)
-      (let* ((agent (make-instance 'test-agent))
+      (let* ((agent      (make-instance 'test-agent))
              (connection (make-acp-connection :channel channel :peer agent))
-             (first (agent--register-session agent "first" "/work"))
-             (second (agent--register-session agent "second" "/work")))
+             (first      (agent--register-session agent "first" "/work"))
+             (second     (agent--register-session agent "second" "/work")))
         (unwind-protect
              (progn
                (connection-close connection)
@@ -155,28 +156,29 @@
           (connection-close connection)
           (channel-close remote)))))
 
+
 ;;;; -- Session Teardown Races --
 
 (defclass lifecycle-test-agent (test-agent)
   ((lock
-    :initform (make-lock "lifecycle test")
-    :reader lifecycle-test-lock
+    :initform      (make-lock "lifecycle test")
+    :reader        lifecycle-test-lock
     :documentation "The lock guarding the prompt gate.")
    (condition
-    :initform (make-condition-variable)
-    :reader lifecycle-test-condition
+    :initform      (make-condition-variable)
+    :reader        lifecycle-test-condition
     :documentation "The condition used to release the prompt gate.")
    (entered-p
-    :initform nil
-    :accessor lifecycle-test-entered-p
+    :initform      nil
+    :accessor      lifecycle-test-entered-p
     :documentation "Whether a prompt reached the gate.")
    (release-p
-    :initform nil
-    :accessor lifecycle-test-release-p
+    :initform      nil
+    :accessor      lifecycle-test-release-p
     :documentation "Whether the prompt gate is released.")
    (closed-p
-    :initform nil
-    :accessor lifecycle-test-closed-p
+    :initform      nil
+    :accessor      lifecycle-test-closed-p
     :documentation "Whether the agent closed a session."))
   (:documentation "A test agent that holds each prompt until the test releases it."))
 
@@ -197,13 +199,13 @@
   nil)
 
 (define-test agent-close-waits-for-prompt-completion
-    (let* ((agent (make-instance 'lifecycle-test-agent))
-           (session (agent--register-session agent "session" "/work"))
-           (outcome nil)
+    (let* ((agent         (make-instance 'lifecycle-test-agent))
+           (session       (agent--register-session agent "session" "/work"))
+           (outcome       nil)
            (prompt-thread (make-thread
                            (lambda ()
                              (setf outcome (agent--run-prompt agent session nil :params (json-object))))))
-           (close-thread nil))
+           (close-thread  nil))
       (unwind-protect
            (progn
              (test-assert (test-wait-until (lambda () (lifecycle-test-entered-p agent))))
@@ -245,14 +247,14 @@
 
 (defclass lifecycle-test-notification-peer (test-echo-peer)
   ((entered-p
-    :initform nil
-    :accessor lifecycle-test-notification-entered-p
-    :type boolean
+    :initform      nil
+    :accessor      lifecycle-test-notification-entered-p
+    :type          boolean
     :documentation "Whether the reader entered the notification callback.")
    (completed-p
-    :initform nil
-    :accessor lifecycle-test-notification-completed-p
-    :type boolean
+    :initform      nil
+    :accessor      lifecycle-test-notification-completed-p
+    :type          boolean
     :documentation "Whether the callback finished after connection closure."))
   (:documentation "A peer whose notification callback spans a concurrent close."))
 
@@ -269,7 +271,7 @@
 
 (define-test connection-close-finishes-notification-dispatch
   (multiple-value-bind (channel remote) (make-acp-channel-pair)
-    (let* ((peer (make-instance 'lifecycle-test-notification-peer))
+    (let* ((peer       (make-instance 'lifecycle-test-notification-peer))
            (connection (make-acp-connection :channel channel :peer peer)))
       (unwind-protect
            (progn

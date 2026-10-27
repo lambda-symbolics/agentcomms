@@ -4,10 +4,10 @@
 
 (defclass acp-channel ()
   ((maximum-message-characters
-    :initarg :maximum-message-characters
-    :initform *acp-maximum-message-characters*
-    :accessor channel-maximum-message-characters
-    :type integer
+    :initarg       :maximum-message-characters
+    :initform      *acp-maximum-message-characters*
+    :accessor      channel-maximum-message-characters
+    :type          integer
     :documentation "The longest message this channel accepts or sends."))
   (:documentation
    "A bidirectional carrier of newline-delimited JSON-RPC messages.
@@ -32,7 +32,6 @@ channel's maximum message characters."))
 (defgeneric channel-open-p (channel)
   (:documentation "Return true while CHANNEL can still carry messages."))
 
-
 (-> channel--check-length (acp-channel string) null)
 (defun channel--check-length (channel text)
   "Signal ACP-MESSAGE-TOO-LARGE when TEXT exceeds CHANNEL's limit."
@@ -40,7 +39,7 @@ channel's maximum message characters."))
     (when (> (length text) limit)
       (error 'acp-message-too-large
              :message (format nil "The message exceeds ~D characters." limit)
-             :limit limit)))
+             :limit   limit)))
   nil)
 
 
@@ -48,34 +47,34 @@ channel's maximum message characters."))
 
 (defclass acp-stream-channel (acp-channel)
   ((input
-    :initarg :input
-    :reader acp-stream-channel-input
-    :type stream
+    :initarg       :input
+    :reader        acp-stream-channel-input
+    :type          stream
     :documentation "The character input stream carrying peer messages.")
    (output
-    :initarg :output
-    :reader acp-stream-channel-output
-    :type stream
+    :initarg       :output
+    :reader        acp-stream-channel-output
+    :type          stream
     :documentation "The character output stream carrying this side's messages.")
    (close-function
-    :initarg :close-function
-    :initform nil
-    :reader acp-stream-channel-close-function
-    :type (or null function)
+    :initarg       :close-function
+    :initform      nil
+    :reader        acp-stream-channel-close-function
+    :type          (or null function)
     :documentation "An optional function run once when the channel closes.")
    (open-p
-    :initform t
-    :accessor acp-stream-channel-open-p
-    :type boolean
+    :initform      t
+    :accessor      acp-stream-channel-open-p
+    :type          boolean
     :documentation "Whether the channel still accepts messages.")
    (close-lock
-    :initform (make-recursive-lock "agentcomms stream cleanup")
-    :reader acp-stream-channel-close-lock
+    :initform      (make-recursive-lock "agentcomms stream cleanup")
+    :reader        acp-stream-channel-close-lock
     :documentation "Serialize complete cleanup, including recursive close calls.")
    (lock
-    :initform (make-lock "agentcomms stream channel")
-    :reader acp-stream-channel-lock
-    :type t
+    :initform      (make-lock "agentcomms stream channel")
+    :reader        acp-stream-channel-lock
+    :type          t
     :documentation "The lock serializing state changes and output."))
   (:documentation
    "A channel over a pair of UTF-8 character streams, one line per message."))
@@ -91,9 +90,9 @@ channel's maximum message characters."))
 
 CLOSE-FUNCTION, when supplied, runs once after the streams close."
   (make-instance 'acp-stream-channel
-                 :input input
-                 :output output
-                 :close-function close-function
+                 :input                      input
+                 :output                     output
+                 :close-function             close-function
                  :maximum-message-characters maximum-message-characters))
 
 (-> channel--read-bounded-line (stream integer) (or null string))
@@ -102,9 +101,9 @@ CLOSE-FUNCTION, when supplied, runs once after the streams close."
 
 A longer line is consumed through its newline and then rejected so the
 stream stays aligned on message boundaries."
-  (let ((buffer (make-array 256 :element-type 'character
-                                :adjustable t
-                                :fill-pointer 0))
+  (let ((buffer     (make-array 256 :element-type 'character
+                                    :adjustable   t
+                                    :fill-pointer 0))
         (overflow-p nil))
     (loop
       (let ((character (read-char stream nil nil)))
@@ -116,7 +115,7 @@ stream stays aligned on message boundaries."
                 (error 'acp-message-too-large
                        :message (format nil "The incoming message exceeds ~D characters."
                                         limit)
-                       :limit limit))
+                       :limit   limit))
                ((zerop (length buffer))
                 nil)
                (t
@@ -126,7 +125,7 @@ stream stays aligned on message boundaries."
              (error 'acp-message-too-large
                     :message (format nil "The incoming message exceeds ~D characters."
                                      limit)
-                    :limit limit))
+                    :limit   limit))
            (return (string-right-trim '(#\Return) (coerce buffer 'simple-string))))
           (overflow-p
            nil)
@@ -197,34 +196,34 @@ stream stays aligned on message boundaries."
 
 (defclass acp-pipe-channel (acp-channel)
   ((peer
-    :initform nil
-    :accessor acp-pipe-channel-peer
-    :type (or null acp-pipe-channel)
+    :initform      nil
+    :accessor      acp-pipe-channel-peer
+    :type          (or null acp-pipe-channel)
     :documentation "The channel receiving what this one writes.")
    (incoming
-    :initform nil
-    :accessor acp-pipe-channel-incoming
-    :type list
+    :initform      nil
+    :accessor      acp-pipe-channel-incoming
+    :type          list
     :documentation "Delivered message texts awaiting a reader, oldest first.")
    (input-ended-p
-    :initform nil
-    :accessor acp-pipe-channel-input-ended-p
-    :type boolean
+    :initform      nil
+    :accessor      acp-pipe-channel-input-ended-p
+    :type          boolean
     :documentation "Whether the peer closed, ending input after the queue drains.")
    (open-p
-    :initform t
-    :accessor acp-pipe-channel-open-p
-    :type boolean
+    :initform      t
+    :accessor      acp-pipe-channel-open-p
+    :type          boolean
     :documentation "Whether this end still accepts writes.")
    (lock
-    :initform (make-lock "agentcomms pipe channel")
-    :reader acp-pipe-channel-lock
-    :type t
+    :initform      (make-lock "agentcomms pipe channel")
+    :reader        acp-pipe-channel-lock
+    :type          t
     :documentation "The lock guarding the queue and flags.")
    (condition
-    :initform (make-condition-variable :name "agentcomms pipe channel")
-    :reader acp-pipe-channel-condition
-    :type t
+    :initform      (make-condition-variable :name "agentcomms pipe channel")
+    :reader        acp-pipe-channel-condition
+    :type          t
     :documentation "Signaled when a message arrives or input ends."))
   (:documentation
    "One end of an in-process channel pair for tests and embedded peers."))
@@ -234,8 +233,8 @@ stream stays aligned on message boundaries."
 (defun make-acp-channel-pair
     (&key (maximum-message-characters *acp-maximum-message-characters*))
   "Return two connected in-memory channels; each reads what the other writes."
-  (let ((left (make-instance 'acp-pipe-channel
-                             :maximum-message-characters maximum-message-characters))
+  (let ((left  (make-instance 'acp-pipe-channel
+                              :maximum-message-characters maximum-message-characters))
         (right (make-instance 'acp-pipe-channel
                               :maximum-message-characters maximum-message-characters)))
     (setf (acp-pipe-channel-peer left) right

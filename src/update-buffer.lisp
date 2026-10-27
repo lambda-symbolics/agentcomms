@@ -8,7 +8,7 @@
    (validator :initarg :validator :reader update-buffer-validator :type function
               :documentation "The preflight validator for one complete outgoing update.")
    (thought-batch-size :initarg :thought-batch-size :reader update-buffer-thought-batch-size
-                       :type (integer 1 *)
+                       :type          (integer 1 *)
                        :documentation "The character threshold for emitting a text thought batch.")
    (template :initform nil :accessor update-buffer-template :type (or null hash-table)
              :documentation "A private snapshot of the pending update, excluding its text.")
@@ -49,7 +49,7 @@ candidate; signal ACP-MESSAGE-TOO-LARGE to split a batch before its wire limit."
              (equal (json-get content "type") "text")
              (stringp (json-get content "text")))
         (let ((template (update-buffer--copy-object update))
-              (body (update-buffer--copy-object content)))
+              (body     (update-buffer--copy-object content)))
           (remhash "text" body)
           (setf (gethash "content" template) body)
           (values (json-encode template) (json-get content "text")))
@@ -71,7 +71,7 @@ candidate; signal ACP-MESSAGE-TOO-LARGE to split a batch before its wire limit."
 (defun update-buffer--candidate-p (buffer text)
   "Return whether BUFFER's pending update can carry TEXT within its wire limit."
   (let* ((candidate (update-buffer--copy-object (update-buffer-template buffer)))
-         (content (update-buffer--copy-object (gethash "content" candidate))))
+         (content   (update-buffer--copy-object (gethash "content" candidate))))
     (setf (gethash "text" content) text
           (gethash "content" candidate) content)
     (handler-case

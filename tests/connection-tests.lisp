@@ -4,24 +4,24 @@
 
 (defclass test-echo-peer (acp-peer)
   ((notifications
-    :initform nil
-    :accessor test-echo-peer-notifications
-    :type list
+    :initform      nil
+    :accessor      test-echo-peer-notifications
+    :type          list
     :documentation "Notifications received, oldest first, as (METHOD . PARAMS).")
    (close-reasons
-    :initform nil
-    :accessor test-echo-peer-close-reasons
-    :type list
+    :initform      nil
+    :accessor      test-echo-peer-close-reasons
+    :type          list
     :documentation "Close reasons observed, newest first; NIL marks a clean close.")
    (closed-count
-    :initform 0
-    :accessor test-echo-peer-closed-count
-    :type (integer 0)
+    :initform      0
+    :accessor      test-echo-peer-closed-count
+    :type          (integer 0)
     :documentation "How many times the close hook ran.")
    (lock
-    :initform (make-lock "agentcomms test peer")
-    :reader test-echo-peer-lock
-    :type t
+    :initform      (make-lock "agentcomms test peer")
+    :reader        test-echo-peer-lock
+    :type          t
     :documentation "The lock guarding the recorded notifications."))
   (:documentation "A peer with echo, failure, and cancellation-aware methods."))
 
@@ -35,9 +35,9 @@
      nil)
     ((string= method "fail")
      (error 'acp-method-error
-            :code -32001
+            :code    -32001
             :message "scripted failure"
-            :data (json-object "detail" "from the test peer")))
+            :data    (json-object "detail" "from the test peer")))
     ((string= method "crash")
      (error "an unexpected Lisp error"))
     ((string= method "wait-for-cancel")
@@ -74,7 +74,7 @@
   "Return two connected connections and their peers."
   (multiple-value-bind (left right)
       (make-acp-channel-pair)
-    (let ((left-peer (make-instance 'test-echo-peer))
+    (let ((left-peer  (make-instance 'test-echo-peer))
           (right-peer (make-instance 'test-echo-peer)))
       (values (make-acp-connection :channel left :peer left-peer :name "left")
               (make-acp-connection :channel right :peer right-peer :name "right")
@@ -188,13 +188,13 @@
       (test-connection-pair)
     (unwind-protect
          (let* ((outcome nil)
-                (thread (make-thread
-                         (lambda ()
-                           (setf outcome
-                                 (handler-case
-                                     (connection-request left "wait-for-cancel" nil)
-                                   (acp-remote-error (condition)
-                                     (acp-method-error-code condition))))))))
+                (thread  (make-thread
+                          (lambda ()
+                            (setf outcome
+                                  (handler-case
+                                      (connection-request left "wait-for-cancel" nil)
+                                    (acp-remote-error (condition)
+                                      (acp-method-error-code condition))))))))
            (test-assert (test-wait-until
                          (lambda ()
                            (with-lock-held ((acp-connection-lock right))
@@ -213,13 +213,13 @@
   (multiple-value-bind (left right left-peer right-peer)
       (test-connection-pair)
     (let* ((outcome nil)
-           (thread (make-thread
-                    (lambda ()
-                      (setf outcome
-                            (handler-case
-                                (connection-request left "wait-for-cancel" nil)
-                              (acp-connection-closed ()
-                                ':closed)))))))
+           (thread  (make-thread
+                     (lambda ()
+                       (setf outcome
+                             (handler-case
+                                 (connection-request left "wait-for-cancel" nil)
+                               (acp-connection-closed ()
+                                 ':closed)))))))
       (test-assert (test-wait-until
                     (lambda ()
                       (with-lock-held ((acp-connection-lock left))
@@ -277,9 +277,9 @@
         (channel-close right)))))
 
 (define-test stream-channel-frames-lines
-  (let* ((input (make-string-input-stream
-                 (format nil "~%{\"a\": 1}~C~%   ~%{\"b\": 2}" #\Return)))
-         (output (make-string-output-stream))
+  (let* ((input   (make-string-input-stream
+                   (format nil "~%{\"a\": 1}~C~%   ~%{\"b\": 2}" #\Return)))
+         (output  (make-string-output-stream))
          (channel (make-acp-stream-channel :input input :output output)))
     (test-equal "{\"a\": 1}" (channel-read-message channel))
     (test-equal "{\"b\": 2}" (channel-read-message channel))
@@ -291,8 +291,8 @@
     (test-assert (not (channel-open-p channel)))
     (test-signals acp-connection-closed (channel-write-message channel "late")))
   (let ((channel (make-acp-stream-channel
-                  :input (make-string-input-stream (format nil "abcdefgh~%ok~%"))
-                  :output (make-string-output-stream)
+                  :input                      (make-string-input-stream (format nil "abcdefgh~%ok~%"))
+                  :output                     (make-string-output-stream)
                   :maximum-message-characters 4)))
     (test-signals acp-message-too-large (channel-read-message channel))
     (test-equal "ok" (channel-read-message channel))
@@ -303,7 +303,7 @@
       (test-connection-pair)
     (declare (ignore left-peer right-peer))
     (unwind-protect
-         (let ((identifier nil)
+         (let ((identifier    nil)
                (called-thread nil))
            (test-equal "value"
                        (json-get

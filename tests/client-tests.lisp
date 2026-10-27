@@ -22,9 +22,9 @@
       (cond
         ((string= text "terminal")
          (let ((terminal-id (agent-create-terminal agent session-id "make"
-                                                   :arguments '("test")
-                                                   :environment '(("CI" . "1"))
-                                                   :cwd "/w"
+                                                   :arguments         '("test")
+                                                   :environment       '(("CI" . "1"))
+                                                   :cwd               "/w"
                                                    :output-byte-limit 4096)))
            (multiple-value-bind (output truncated-p exited-p code signal)
                (agent-terminal-output agent session-id terminal-id)
@@ -40,18 +40,18 @@
          ':end-turn)
         ((string= text "elicit")
          (multiple-value-bind (action content)
-             (agent-create-elicitation agent :mode ':form
-                                             :message "Pick a strategy"
+             (agent-create-elicitation agent :mode       ':form
+                                             :message    "Pick a strategy"
                                              :session-id session-id
-                                             :schema (json-object "type" "object"))
+                                             :schema     (json-object "type" "object"))
            (say (format nil "~(~A~) ~A" action (and content (json-get content "strategy"))))
            ':end-turn))
         ((string= text "elicit-url")
          (multiple-value-bind (action content)
-             (agent-create-elicitation agent :mode ':url
-                                             :message "Authorize"
-                                             :session-id session-id
-                                             :url "https://example.test/auth"
+             (agent-create-elicitation agent :mode           ':url
+                                             :message        "Authorize"
+                                             :session-id     session-id
+                                             :url            "https://example.test/auth"
                                              :elicitation-id "e-1")
            (declare (ignore content))
            (agent-complete-elicitation agent "e-1")
@@ -62,34 +62,34 @@
 
 (defclass test-client (acp-client)
   ((updates
-    :initform nil
-    :accessor test-client-updates
-    :type list
+    :initform      nil
+    :accessor      test-client-updates
+    :type          list
     :documentation "Session updates received, oldest first, as (SESSION-ID . UPDATE).")
    (permission-choice
-    :initform "allow"
-    :accessor test-client-permission-choice
-    :type (or null string)
+    :initform      "allow"
+    :accessor      test-client-permission-choice
+    :type          (or null string)
     :documentation "The option id to select, or NIL to answer cancelled.")
    (writes
-    :initform nil
-    :accessor test-client-writes
-    :type list
+    :initform      nil
+    :accessor      test-client-writes
+    :type          list
     :documentation "File writes received as (PATH . CONTENT).")
    (terminal-calls
-    :initform nil
-    :accessor test-client-terminal-calls
-    :type list
+    :initform      nil
+    :accessor      test-client-terminal-calls
+    :type          list
     :documentation "Terminal method names received, oldest first.")
    (completed-elicitations
-    :initform nil
-    :accessor test-client-completed-elicitations
-    :type list
+    :initform      nil
+    :accessor      test-client-completed-elicitations
+    :type          list
     :documentation "Elicitation ids reported complete.")
    (lock
-    :initform (make-lock "agentcomms test client")
-    :reader test-client-lock
-    :type t
+    :initform      (make-lock "agentcomms test client")
+    :reader        test-client-lock
+    :type          t
     :documentation "The lock guarding the records."))
   (:documentation "A client with fake files, terminals, and elicitation."))
 
@@ -179,7 +179,7 @@
   "Return a connected client and agent of the given classes, not yet initialized."
   (multiple-value-bind (left right)
       (make-acp-channel-pair)
-    (let ((agent (make-instance agent-class))
+    (let ((agent  (make-instance agent-class))
           (client (make-instance client-class)))
       (acp-agent-connect agent right :name "test agent")
       (acp-client-connect client left :name "test client")
@@ -234,7 +234,7 @@
       (acp-client-connect client left)
       (let ((agent-side (make-acp-connection
                          :channel right
-                         :peer (make-instance 'test-echo-peer))))
+                         :peer    (make-instance 'test-echo-peer))))
         (unwind-protect
              (test-equal -32601
                          (acp-method-error-code
@@ -345,7 +345,7 @@
   (multiple-value-bind (left right)
       (make-acp-channel-pair)
     (let* ((client (make-instance 'acp-client))
-           (raw (make-acp-connection :channel right :peer (make-instance 'test-echo-peer))))
+           (raw    (make-acp-connection :channel right :peer (make-instance 'test-echo-peer))))
       (acp-client-connect client left)
       (unwind-protect
            (progn

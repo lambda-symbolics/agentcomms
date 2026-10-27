@@ -48,7 +48,7 @@
 
 (define-test schema-capability-queries
   (let ((client (acp-client-capabilities :read-text-file t :terminal t :elicitation-url t))
-        (agent (acp-agent-capabilities :load-session t :image t :list t :logout t)))
+        (agent  (acp-agent-capabilities :load-session t :image t :list t :logout t)))
     (test-assert (acp-capability-enabled-p client "fs.readTextFile"))
     (test-assert (not (acp-capability-enabled-p client "fs.writeTextFile")))
     (test-assert (acp-capability-enabled-p client "terminal"))
@@ -99,14 +99,14 @@
                    (test-signals acp-method-error (acp-validate-content-blocks (list bad))))))))
 
 (define-test schema-tool-calls-and-updates
-  (let* ((call (acp-tool-call "call-1" "Reading config"
-                              :name "read_file" :kind ':read :status ':pending
-                              :locations (list (acp-tool-call-location "/p/config.json" :line 3))
-                              :raw-input (json-object "path" "/p/config.json")))
-         (update (acp-tool-call-update "call-1" :status ':completed
-                                       :content (list (acp-tool-call-content (acp-text-content "done"))
-                                                      (acp-diff-content "/p/a" "new" :old-text "old")
-                                                      (acp-terminal-content "term-1"))))
+  (let* ((call     (acp-tool-call "call-1" "Reading config"
+                                  :name "read_file" :kind ':read :status ':pending
+                                  :locations (list (acp-tool-call-location "/p/config.json" :line 3))
+                                  :raw-input (json-object "path" "/p/config.json")))
+         (update   (acp-tool-call-update "call-1" :status ':completed
+                                         :content         (list (acp-tool-call-content (acp-text-content "done"))
+                                                                (acp-diff-content "/p/a" "new" :old-text "old")
+                                                                (acp-terminal-content "term-1"))))
          (announce (acp-update-tool-call call))
          (progress (acp-update-tool-call-progress update)))
     (test-equal "read" (json-get call "kind"))
@@ -145,7 +145,7 @@
 
 (define-test schema-mcp-servers
   (let ((servers (list (acp-mcp-server-stdio "fs" "/bin/server" :arguments '("--stdio")
-                                             :environment (list (acp-env-variable "KEY" "v")))
+                                             :environment                  (list (acp-env-variable "KEY" "v")))
                        (acp-mcp-server-http "api" "https://example.test/mcp"
                                             :headers (list (acp-http-header "Authorization" "Bearer x")))
                        (acp-mcp-server-sse "events" "https://example.test/sse"))))
@@ -163,7 +163,7 @@
                        "nope"))
       (test-signals acp-method-error (acp-validate-mcp-servers (list bad)))))
   (let ((method (acp-terminal-auth-method "login" "Log in" :arguments '("--login")
-                                          :environment '(("ACP_LOGIN" . "1")))))
+                                          :environment                '(("ACP_LOGIN" . "1")))))
     (test-equal "terminal" (json-get method "type"))
     (test-equal "1" (json-get (json-get method "env") "ACP_LOGIN"))
     (test-equal '("--login") (json-sequence->list (json-get method "args")))))
