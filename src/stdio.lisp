@@ -142,8 +142,10 @@ when it does not."))
   "Wait for the agent to exit after its input closed, escalating to termination."
   (let ((process (acp-process-channel-process channel)))
     (unless (process-channel--wait-exit channel *acp-process-exit-seconds*)
+      ; mallet:suppress no-ignore-errors -- the agent may exit before it is terminated
       (ignore-errors (uiop:terminate-process process))
       (unless (process-channel--wait-exit channel *acp-process-kill-seconds*)
+        ; mallet:suppress no-ignore-errors -- the agent may exit before it is killed
         (ignore-errors (uiop:terminate-process process :urgent t))
         (process-channel--wait-exit channel *acp-process-kill-seconds*)))
     (setf (acp-process-channel-exit-code channel)
@@ -157,7 +159,9 @@ when it does not."))
           (loop while (and (thread-alive-p thread) (< (get-internal-real-time) deadline))
                 do (sleep 0.01)))
         (when (thread-alive-p thread)
+          ; mallet:suppress no-ignore-errors -- the stderr reader may exit before it is destroyed
           (ignore-errors (destroy-thread thread)))))
+    ; mallet:suppress no-ignore-errors -- shutdown finishes even when a process stream fails to close
     (ignore-errors (uiop:close-streams process)))
   nil)
 

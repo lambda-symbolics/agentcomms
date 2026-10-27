@@ -234,6 +234,7 @@ server error -32001; responses and cancellation notifications continue."
   "Pass one formatted diagnostic to the connection's log function, if any."
   (let ((function (acp-connection-log-function connection)))
     (when function
+      ; mallet:suppress no-ignore-errors -- a failing log function must not break the connection
       (ignore-errors (funcall function (apply #'format nil control arguments)))))
   nil)
 
@@ -375,6 +376,7 @@ Every exit removes the pending request; an abandoned request is cancelled."
         (remhash (acp-pending-request-identifier pending)
                  (acp-connection-pending connection)))
       (unless (acp-pending-request-done-p pending)
+        ; mallet:suppress no-ignore-errors -- best-effort cancellation must not mask the original exit
         (ignore-errors
           (connection-cancel-request connection
                                      (acp-pending-request-identifier pending)))))))
@@ -664,6 +666,7 @@ Destroy a reader that outlives the deadline. Return true when it has ended."
                           (* *acp-close-join-seconds* internal-time-units-per-second))))
           ;; Closing a descriptor in another thread need not wake its blocked read.
           (when (thread-alive-p thread)
+            ; mallet:suppress no-ignore-errors -- the reader may exit before the interrupt arrives
             (ignore-errors
               (interrupt-thread
                thread
@@ -674,8 +677,10 @@ Destroy a reader that outlives the deadline. Return true when it has ended."
                           (< (get-internal-real-time) deadline))
                do (sleep 0.01))
          (when (thread-alive-p thread)
+           ; mallet:suppress no-ignore-errors -- the reader may exit before it is destroyed
            (ignore-errors (destroy-thread thread)))
          (unless (thread-alive-p thread)
+           ; mallet:suppress no-ignore-errors -- a destroyed reader may fail to join
            (ignore-errors (join-thread thread)))
          (not (thread-alive-p thread)))))))
 
@@ -699,6 +704,7 @@ its ownership record is retained until it unwinds. No handler is destroyed."
                            (< (get-internal-real-time) deadline))
                 do (sleep 0.01))
           (unless (thread-alive-p thread)
+            ; mallet:suppress no-ignore-errors -- a handler that already exited may fail to join
             (ignore-errors (join-thread thread))))))
     (notany (lambda (request)
               (let ((thread (acp-inbound-request-thread request)))
@@ -734,6 +740,7 @@ interrupt providers or release application waits. Closing twice is harmless."
          (condition-notify (acp-pending-request-condition request)))
        (acp-connection-pending connection))
       (clrhash (acp-connection-pending connection)))
+    ; mallet:suppress no-ignore-errors -- the connection closes even when its channel fails to close
     (ignore-errors (channel-close (acp-connection-channel connection)))
     (handler-case (peer-connection-closed (acp-connection-peer connection) connection reason)
       (error (condition)

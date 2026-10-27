@@ -183,7 +183,9 @@ stream stays aligned on message boundaries."
           (setf (acp-stream-channel-open-p channel) nil
                 close-p t)))
       (when close-p
+        ; mallet:suppress no-ignore-errors -- the channel closes even when a stream fails to close
         (ignore-errors (close (acp-stream-channel-output channel)))
+        ; mallet:suppress no-ignore-errors -- the channel closes even when a stream fails to close
         (ignore-errors (close (acp-stream-channel-input channel)))
         (let ((function (acp-stream-channel-close-function channel)))
           (when function
