@@ -102,7 +102,7 @@
   (acp-client-capabilities :read-text-file t :write-text-file t :terminal t
                            :elicitation-form t :boolean-config-options t))
 
-(defmethod client-session-update ((client test-client) session-id update params)
+(defmethod client-session-update ((client test-client) session-id update &key params)
   "Record the update."
   (declare (ignore params))
   (with-lock-held ((test-client-lock client))
@@ -110,7 +110,7 @@
           (nconc (test-client-updates client) (list (cons session-id update)))))
   nil)
 
-(defmethod client-request-permission ((client test-client) session-id tool-call options params)
+(defmethod client-request-permission ((client test-client) session-id tool-call &key options params)
   "Select the configured option."
   (declare (ignore session-id tool-call options params))
   (let ((choice (test-client-permission-choice client)))
@@ -123,7 +123,7 @@
   (declare (ignore session-id params))
   (format nil "line ~A of ~A (~A)" line path limit))
 
-(defmethod client-write-text-file ((client test-client) session-id path content params)
+(defmethod client-write-text-file ((client test-client) session-id path &key content params)
   "Record the write."
   (declare (ignore session-id params))
   (push (cons path content) (test-client-writes client))
@@ -138,25 +138,25 @@
         (test-client-terminal-calls client))
   "term-1")
 
-(defmethod client-terminal-output ((client test-client) session-id terminal-id params)
+(defmethod client-terminal-output ((client test-client) session-id terminal-id &key params)
   "Report running output."
   (declare (ignore session-id params))
   (push (format nil "output ~A" terminal-id) (test-client-terminal-calls client))
   (values "building..." t nil nil nil))
 
-(defmethod client-wait-for-terminal-exit ((client test-client) session-id terminal-id params)
+(defmethod client-wait-for-terminal-exit ((client test-client) session-id terminal-id &key params)
   "Report a signal exit."
   (declare (ignore session-id params))
   (push (format nil "wait ~A" terminal-id) (test-client-terminal-calls client))
   (values nil "SIGTERM"))
 
-(defmethod client-kill-terminal ((client test-client) session-id terminal-id params)
+(defmethod client-kill-terminal ((client test-client) session-id terminal-id &key params)
   "Record the kill."
   (declare (ignore session-id params))
   (push (format nil "kill ~A" terminal-id) (test-client-terminal-calls client))
   nil)
 
-(defmethod client-release-terminal ((client test-client) session-id terminal-id params)
+(defmethod client-release-terminal ((client test-client) session-id terminal-id &key params)
   "Record the release."
   (declare (ignore session-id params))
   (push (format nil "release ~A" terminal-id) (test-client-terminal-calls client))

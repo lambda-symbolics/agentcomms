@@ -147,12 +147,12 @@ Subclass =ACP-CLIENT=, launch the agent, and drive it:
 (defmethod acp:client-capabilities ((client my-client))
   (acp:acp-client-capabilities :read-text-file t :write-text-file t))
 
-(defmethod acp:client-session-update ((client my-client) session-id update params)
+(defmethod acp:client-session-update ((client my-client) session-id update &key params)
   (declare (ignore session-id params))
   (when (eq (acp:acp-update-kind update) :agent-message-chunk)
     (write-string (acp:acp-content-text (acp:json-get update "content")))))
 
-(defmethod acp:client-request-permission ((client my-client) session-id tool-call options params)
+(defmethod acp:client-request-permission ((client my-client) session-id tool-call &key options params)
   (declare (ignore session-id tool-call params))
   (values :selected (acp:json-get (first options) "optionId")))
 

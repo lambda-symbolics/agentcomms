@@ -88,13 +88,13 @@ agent's requests; call the CLIENT- functions below to drive the agent."))
 Build it with ACP-CLIENT-CAPABILITIES. Agent requests for file system,
 terminal, and elicitation methods are only dispatched when advertised."))
 
-(defgeneric client-session-update (client session-id update params)
+(defgeneric client-session-update (client session-id update &key params)
   (:documentation
    "Observe session UPDATE for SESSION-ID; ACP-UPDATE-KIND names its kind.
 
 PARAMS is the whole notification object, including any _meta."))
 
-(defgeneric client-request-permission (client session-id tool-call options params)
+(defgeneric client-request-permission (client session-id tool-call &key options params)
   (:documentation
    "Decide whether TOOL-CALL may run, choosing among permission OPTIONS.
 
@@ -104,7 +104,7 @@ turn was cancelled."))
 (defgeneric client-read-text-file (client session-id path &key line limit params)
   (:documentation "Return the text of PATH, from 1-based LINE for at most LIMIT lines."))
 
-(defgeneric client-write-text-file (client session-id path content params)
+(defgeneric client-write-text-file (client session-id path &key content params)
   (:documentation "Write CONTENT to PATH, creating the file when needed."))
 
 (defgeneric client-create-terminal
@@ -114,20 +114,20 @@ turn was cancelled."))
 
 ENVIRONMENT is a list of (NAME . VALUE) strings."))
 
-(defgeneric client-terminal-output (client session-id terminal-id params)
+(defgeneric client-terminal-output (client session-id terminal-id &key params)
   (:documentation
    "Return TERMINAL-ID's output so far and its exit state.
 
 Return five values: the output, whether it was truncated, whether the
 command exited, its exit code, and its terminating signal."))
 
-(defgeneric client-wait-for-terminal-exit (client session-id terminal-id params)
+(defgeneric client-wait-for-terminal-exit (client session-id terminal-id &key params)
   (:documentation "Block until TERMINAL-ID exits; return its exit code and signal."))
 
-(defgeneric client-kill-terminal (client session-id terminal-id params)
+(defgeneric client-kill-terminal (client session-id terminal-id &key params)
   (:documentation "Kill TERMINAL-ID's command while keeping its output readable."))
 
-(defgeneric client-release-terminal (client session-id terminal-id params)
+(defgeneric client-release-terminal (client session-id terminal-id &key params)
   (:documentation "Release TERMINAL-ID, killing its command when still running."))
 
 (defgeneric client-create-elicitation (client params)
@@ -154,12 +154,12 @@ accepted form, the content object."))
   "Advertise no optional capabilities."
   (acp-client-capabilities))
 
-(defmethod client-session-update ((client acp-client) session-id update params)
+(defmethod client-session-update ((client acp-client) session-id update &key params)
   "Ignore updates by default."
   (declare (ignore session-id update params))
   nil)
 
-(defmethod client-request-permission ((client acp-client) session-id tool-call options params)
+(defmethod client-request-permission ((client acp-client) session-id tool-call &key options params)
   "Signal that permission handling is unimplemented."
   (declare (ignore session-id tool-call options params))
   (error 'acp-method-error
@@ -180,7 +180,7 @@ accepted form, the content object."))
   (declare (ignore session-id path line limit params))
   (client--unadvertised "fs/read_text_file"))
 
-(defmethod client-write-text-file ((client acp-client) session-id path content params)
+(defmethod client-write-text-file ((client acp-client) session-id path &key content params)
   "Signal that file writing is unavailable."
   (declare (ignore session-id path content params))
   (client--unadvertised "fs/write_text_file"))
@@ -191,22 +191,22 @@ accepted form, the content object."))
   (declare (ignore session-id command arguments environment cwd output-byte-limit params))
   (client--unadvertised "terminal/create"))
 
-(defmethod client-terminal-output ((client acp-client) session-id terminal-id params)
+(defmethod client-terminal-output ((client acp-client) session-id terminal-id &key params)
   "Signal that terminals are unavailable."
   (declare (ignore session-id terminal-id params))
   (client--unadvertised "terminal/output"))
 
-(defmethod client-wait-for-terminal-exit ((client acp-client) session-id terminal-id params)
+(defmethod client-wait-for-terminal-exit ((client acp-client) session-id terminal-id &key params)
   "Signal that terminals are unavailable."
   (declare (ignore session-id terminal-id params))
   (client--unadvertised "terminal/wait_for_exit"))
 
-(defmethod client-kill-terminal ((client acp-client) session-id terminal-id params)
+(defmethod client-kill-terminal ((client acp-client) session-id terminal-id &key params)
   "Signal that terminals are unavailable."
   (declare (ignore session-id terminal-id params))
   (client--unadvertised "terminal/kill"))
 
-(defmethod client-release-terminal ((client acp-client) session-id terminal-id params)
+(defmethod client-release-terminal ((client acp-client) session-id terminal-id &key params)
   "Signal that terminals are unavailable."
   (declare (ignore session-id terminal-id params))
   (client--unadvertised "terminal/release"))
@@ -273,7 +273,9 @@ accepted form, the content object."))
              (acp-field option "optionId" :type ':string :required-p t)
              (acp-field option "name" :type ':string :required-p t))
            (multiple-value-bind (outcome option-id)
-               (client-request-permission client (session-id) tool-call options params)
+               (client-request-permission client (session-id) tool-call
+                                          :options options
+                                          :params  params)
              (json-object "outcome"
                           (ecase outcome
                             (:selected
@@ -295,8 +297,8 @@ accepted form, the content object."))
          (client--require-advertised client "fs.writeTextFile" method)
          (client-write-text-file client (session-id)
                                  (acp-field params "path" :type ':absolute-path :required-p t)
-                                 (acp-field params "content" :type ':string :required-p t)
-                                 params)
+                                 :content (acp-field params "content" :type ':string :required-p t)
+                                 :params  params)
          (json-object))
         (:terminal-create
          (client--require-advertised client "terminal" method)
@@ -316,22 +318,22 @@ accepted form, the content object."))
         (:terminal-output
          (client--require-advertised client "terminal" method)
          (multiple-value-bind (output truncated-p exited-p exit-code signal)
-             (client-terminal-output client (session-id) (terminal-id) params)
+             (client-terminal-output client (session-id) (terminal-id) :params params)
            (json-object "output" output
                         "truncated" (acp-boolean truncated-p)
                         "exitStatus" (and exited-p (client--exit-status-object exit-code signal)))))
         (:terminal-wait-for-exit
          (client--require-advertised client "terminal" method)
          (multiple-value-bind (exit-code signal)
-             (client-wait-for-terminal-exit client (session-id) (terminal-id) params)
+             (client-wait-for-terminal-exit client (session-id) (terminal-id) :params params)
            (client--exit-status-object exit-code signal)))
         (:terminal-kill
          (client--require-advertised client "terminal" method)
-         (client-kill-terminal client (session-id) (terminal-id) params)
+         (client-kill-terminal client (session-id) (terminal-id) :params params)
          (json-object))
         (:terminal-release
          (client--require-advertised client "terminal" method)
-         (client-release-terminal client (session-id) (terminal-id) params)
+         (client-release-terminal client (session-id) (terminal-id) :params params)
          (json-object))
         (:elicitation-create
          (let ((mode (acp-field params "mode" :type ':string :required-p t)))
@@ -363,7 +365,7 @@ accepted form, the content object."))
        (let ((session-id (and (json-object-p params) (json-get params "sessionId")))
              (update (and (json-object-p params) (json-get params "update"))))
          (when (and (stringp session-id) (json-object-p update))
-           (client-session-update client session-id update params))))
+           (client-session-update client session-id update :params params))))
       ((eq keyword ':elicitation-complete)
        (let ((elicitation-id (and (json-object-p params) (json-get params "elicitationId"))))
          (when (stringp elicitation-id)
