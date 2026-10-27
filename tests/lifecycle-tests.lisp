@@ -158,13 +158,30 @@
 ;;;; -- Session Teardown Races --
 
 (defclass lifecycle-test-agent (test-agent)
-  ((lock :initform (make-lock "lifecycle test") :reader lifecycle-test-lock)
-   (condition :initform (make-condition-variable) :reader lifecycle-test-condition)
-   (entered-p :initform nil :accessor lifecycle-test-entered-p)
-   (release-p :initform nil :accessor lifecycle-test-release-p)
-   (closed-p :initform nil :accessor lifecycle-test-closed-p)))
+  ((lock
+    :initform (make-lock "lifecycle test")
+    :reader lifecycle-test-lock
+    :documentation "The lock guarding the prompt gate.")
+   (condition
+    :initform (make-condition-variable)
+    :reader lifecycle-test-condition
+    :documentation "The condition used to release the prompt gate.")
+   (entered-p
+    :initform nil
+    :accessor lifecycle-test-entered-p
+    :documentation "Whether a prompt reached the gate.")
+   (release-p
+    :initform nil
+    :accessor lifecycle-test-release-p
+    :documentation "Whether the prompt gate is released.")
+   (closed-p
+    :initform nil
+    :accessor lifecycle-test-closed-p
+    :documentation "Whether the agent closed a session."))
+  (:documentation "A test agent that holds each prompt until the test releases it."))
 
 (defmethod agent-prompt ((agent lifecycle-test-agent) session-id prompt params)
+  "Hold the prompt until the test releases AGENT's gate, then end the turn."
   (declare (ignore session-id prompt params))
   (with-lock-held ((lifecycle-test-lock agent))
     (setf (lifecycle-test-entered-p agent) t)
@@ -173,6 +190,7 @@
   ':end-turn)
 
 (defmethod agent-close-session ((agent lifecycle-test-agent) session-id params)
+  "Check that SESSION-ID has no running prompt and record the close on AGENT."
   (declare (ignore params))
   (test-assert (not (acp-agent-session-prompt-active-p (acp-agent-session agent session-id))))
   (setf (lifecycle-test-closed-p agent) t)
