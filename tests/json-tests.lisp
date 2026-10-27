@@ -17,7 +17,7 @@
 (define-test json-boundary-signals-protocol-conditions
   (test-signals acp-protocol-error (json-decode "{\"a\": }"))
   (test-signals acp-protocol-error (json-decode "{} trailing"))
-  (test-signals acp-protocol-error (json-encode (json-object "f" #'car)))
+  (test-signals acp-protocol-error (json-encode (json-object "f" #'first)))
   (test-signals acp-protocol-error (json-sequence->list 42))
   (let ((*acp-maximum-message-characters* 8))
     (test-signals acp-message-too-large (json-decode "{\"abc\": 12345}"))
