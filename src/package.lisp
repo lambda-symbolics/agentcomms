@@ -1,4 +1,5 @@
 (defpackage #:agentcomms
+  (:documentation "The Agent Client Protocol version 1, with agent and client peers over JSON-RPC.")
   (:nicknames #:acp)
   (:use #:cl)
   (:import-from #:bordeaux-threads
