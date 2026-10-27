@@ -24,7 +24,8 @@
                 #:json-true-p
                 #:make-json-limits)
   (:import-from #:serapeum
-                #:->)
+                #:->
+                #:partial)
   (:export
    ;; Conditions
    #:acp-error

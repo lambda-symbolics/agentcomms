@@ -28,7 +28,7 @@
 (defun json-object (&rest pairs)
   "Return an equal hash table populated by alternating PAIRS."
   (let ((object (make-hash-table :test #'equal)))
-    (loop for (key value) on pairs by #'cddr
+    (loop for (key value) on pairs by (lambda (tail) (nthcdr 2 tail))
           do (setf (gethash key object) value))
     object))
 

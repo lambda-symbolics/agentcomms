@@ -33,7 +33,7 @@ write :NULL for an explicit JSON null."
     (error 'acp-protocol-error
            :message "JSON object construction requires key and value pairs."))
   (let ((object (make-hash-table :test #'equal)))
-    (loop for (key value) on pairs by #'cddr
+    (loop for (key value) on pairs by (partial #'nthcdr 2)
           do (unless (stringp key)
                (error 'acp-protocol-error
                       :message "JSON object keys must be strings."))

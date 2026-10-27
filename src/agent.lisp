@@ -475,7 +475,7 @@ Return a second value naming the next page cursor when more sessions exist."))
   (let ((object (if (json-object-p extras)
                     extras
                     (json-object))))
-    (loop for (key value) on pairs by #'cddr
+    (loop for (key value) on pairs by (partial #'nthcdr 2)
           do (setf (gethash key object) value))
     object))
 
