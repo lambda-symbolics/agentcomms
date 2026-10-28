@@ -34,3 +34,7 @@
  (:class qlot/source/git:source-git
   :initargs (:remote-url "https://github.com/lambda-symbolics/ls-compat.git" :ref "f3eaf96a8f80120423b5a31055984f9aa688566b")
   :version "git-f3eaf96a8f80120423b5a31055984f9aa688566b"))
+("llh2" .
+ (:class qlot/source/git:source-git
+  :initargs (:remote-url "https://github.com/lambda-symbolics/llh2.git" :ref "f516c92cff438d65fb42d31f4c552b39001e2edc")
+  :version "git-f516c92cff438d65fb42d31f4c552b39001e2edc"))

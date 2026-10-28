@@ -6,3 +6,4 @@ ql serapeum 2026-01-01
 ql usocket 2026-01-01
 git argo https://github.com/lambda-symbolics/argo.git :ref 3658b947372fb19ae07aca65a439b63b0685ae47
 git ls-compat https://github.com/lambda-symbolics/ls-compat.git :ref f3eaf96a8f80120423b5a31055984f9aa688566b
+git llh2 https://github.com/lambda-symbolics/llh2.git :ref f516c92cff438d65fb42d31f4c552b39001e2edc
