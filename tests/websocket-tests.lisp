@@ -225,3 +225,157 @@ OCTETS is a string sent as UTF-8 or a sequence of octets."
            (websocket-close websocket)
            (join-thread reader)
            (join-thread peer)))))))
+
+
+;;;; -- WebSocket Handshake Test Support --
+
+(-> test-call-with-websocket-server (function function) t)
+(defun test-call-with-websocket-server (handler function)
+  "Serve one loopback connection with HANDLER on a thread while calling FUNCTION with its URL.
+
+HANDLER receives the accepted socket. The listener, the socket, and the
+thread are cleaned up on every exit."
+  (let ((listener (tcp-listen "127.0.0.1" 0))
+        (socket   nil)
+        (thread   nil))
+    (unwind-protect
+         (progn
+           (setf thread (make-thread
+                         (lambda ()
+                           (setf socket (tcp-accept listener))
+                           (funcall handler socket))
+                         :name "agentcomms websocket test server"))
+           (funcall function (format nil "ws://127.0.0.1:~D/acp?token=t" (tcp-local-port listener))))
+      (unless (test-wait-until (lambda () (not (thread-alive-p thread))) :seconds 10)
+        (destroy-thread thread))
+      ; mallet:suppress no-ignore-errors -- a destroyed server thread may fail to join
+      (ignore-errors (join-thread thread))
+      (dolist (open-socket (list socket listener))
+        (when open-socket
+          ; mallet:suppress no-ignore-errors -- the server may have closed the socket already
+          (ignore-errors (close-tcp open-socket)))))))
+
+(-> test-upgrade-request (&key (:method string) (:version string) (:headers list)) http-request)
+(defun test-upgrade-request (&key (method "GET") (version "HTTP/1.1") headers)
+  "Return the RFC 6455 sample upgrade request with HEADERS replacing its fields by name."
+  (make-http-request
+   :method  method
+   :target  "/chat"
+   :version version
+   :headers (let ((fields (list (cons "host" "server.example.com")
+                                (cons "upgrade" "websocket")
+                                (cons "connection" "keep-alive, Upgrade")
+                                (cons "sec-websocket-key" "dGhlIHNhbXBsZSBub25jZQ==")
+                                (cons "sec-websocket-version" "13"))))
+              (dolist (header headers fields)
+                (setf fields (remove (first header) fields :key #'first :test #'string-equal))
+                (when (rest header)
+                  (setf fields (append fields (list header))))))))
+
+
+;;;; -- WebSocket Handshake Tests --
+
+(define-test websocket-server-handshake
+  (test-equal "s3pPLMBiTxaQ9kYGzzhZRbK+xOo=" (websocket--accept-key "dGhlIHNhbXBsZSBub25jZQ=="))
+  (let ((request (test-upgrade-request)))
+    (test-assert (websocket-upgrade-request-p request))
+    (test-equal (test-http-octets "HTTP/1.1 101 Switching Protocols
+Upgrade: websocket
+Connection: Upgrade
+Sec-WebSocket-Accept: s3pPLMBiTxaQ9kYGzzhZRbK+xOo=
+Acp-Connection-Id: conn-1
+
+")
+                (test-octets-written
+                 (lambda (stream)
+                   (test-equal ':server
+                               (websocket-connection-role
+                                (websocket-accept stream request
+                                                  :headers '(("Acp-Connection-Id" . "conn-1")))))))
+                :test #'equalp))
+  (dolist (case '((400 :method "POST")
+                  (400 :headers (("upgrade")))
+                  (400 :headers (("connection" . "keep-alive")))
+                  (400 :version "HTTP/1.0")
+                  (426 :headers (("sec-websocket-version" . "8")))
+                  (400 :headers (("sec-websocket-key")))
+                  (400 :headers (("sec-websocket-key" . "c2hvcnQ=")))
+                  (400 :headers (("sec-websocket-key" . "AAAAAAAAAAAAAAAAAAAAAAAA")))
+                  (400 :headers (("sec-websocket-key" . "dGhlIHNhbXBsZSBub25jZQ$=")))))
+    (destructuring-bind (status &rest options) case
+      (let ((written nil)
+            (failure nil))
+        (setf written (test-octets-written
+                       (lambda (stream)
+                         (setf failure (test-signals http-request-error
+                                         (websocket-accept stream (apply #'test-upgrade-request options)))))))
+        (test-equal status (http-request-error-status failure))
+        (test-equal 0 (length written))
+        (test-equal (if (= status 426)
+                        '(("Sec-WebSocket-Version" . "13"))
+                        nil)
+                    (http-request-error-headers failure))))))
+
+(define-test websocket-url-parsing
+  (dolist (case '(("ws://example.com/acp?x=1" "example.com" 80 "/acp?x=1" "example.com")
+                  ("ws://127.0.0.1:8080" "127.0.0.1" 8080 "/" "127.0.0.1:8080")
+                  ("WS://[::1]:9/p" "::1" 9 "/p" "[::1]:9")
+                  ("ws://[::1]" "::1" 80 "/" "[::1]")
+                  ("ws://h?q=1" "h" 80 "/?q=1" "h")))
+    (destructuring-bind (url &rest expected) case
+      (test-equal expected (multiple-value-list (websocket--parse-url url)))))
+  (dolist (url '("wss://example.com/acp" "http://example.com/" "example.com" "ws://h/#f"
+                 "ws://user@h/" "ws://h:0/" "ws://h:x/" "ws://h:/" "ws:///p" "ws://[::1/" "ws://[::1]x/"))
+    (test-signals websocket-error (websocket--parse-url url)))
+  (test-assert (search "TLS" (acp-error-message (test-signals websocket-error
+                                                  (websocket-connect "wss://example.com/acp"))))))
+
+(define-test websocket-client-handshake-and-echo
+  (let ((authorization nil))
+    (test-call-with-websocket-server
+     (lambda (socket)
+       (let* ((stream    (tcp-stream socket))
+              (request   (http1-read-request stream))
+              (websocket (websocket-accept stream request :headers '(("Acp-Connection-Id" . "conn-1"))
+                                                          :socket  socket)))
+         (setf authorization (http-request-header request "authorization"))
+         (loop for message = (websocket-read-message websocket)
+               while message
+               do (websocket-send-text websocket (format nil "echo ~A" message)))))
+     (lambda (url)
+       (let ((websocket (websocket-connect url :headers '(("Authorization" . "Bearer secret")))))
+         (unwind-protect
+              (progn
+                (test-equal "conn-1" (http--header-value (websocket-handshake-headers websocket)
+                                                         "acp-connection-id"))
+                (websocket-send-text websocket "ping ∑")
+                (test-equal "echo ping ∑" (websocket-read-message websocket))
+                (test-equal "Bearer secret" authorization))
+           (websocket-close websocket))
+         (test-equal 1000 (websocket-close-code websocket))))))
+  (dolist (case `((401 ,(lambda (stream request)
+                          (declare (ignore request))
+                          (http1-write-response stream 401 :body "no")))
+                  (101 ,(lambda (stream request)
+                          (declare (ignore request))
+                          (http1-write-response-head stream 101
+                                                     :headers '(("Upgrade" . "websocket")
+                                                                ("Connection" . "Upgrade")
+                                                                ("Sec-WebSocket-Accept" . "wrong")))))
+                  (101 ,(lambda (stream request)
+                          (websocket-accept stream request
+                                            :headers '(("Sec-WebSocket-Extensions" . "permessage-deflate")))))
+                  (nil ,(lambda (stream request)
+                          (declare (ignore request))
+                          (write-sequence (test-http-octets "garbage
+") stream)
+                          (finish-output stream)))))
+    (destructuring-bind (status answer) case
+      (test-call-with-websocket-server
+       (lambda (socket)
+         (let ((stream (tcp-stream socket)))
+           (funcall answer stream (http1-read-request stream))))
+       (lambda (url)
+         (test-equal status
+                     (websocket-handshake-error-status
+                      (test-signals websocket-handshake-error (websocket-connect url)))))))))

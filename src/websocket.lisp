@@ -17,6 +17,9 @@
     (10 . :pong))
   "The frame opcodes RFC 6455 defines and the keywords that name them.")
 
+(defparameter *websocket-accept-guid* "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+  "The GUID RFC 6455 appends to a handshake key to derive the accept value.")
+
 (defvar *websocket-random-lock* (make-lock "agentcomms websocket random data")
   "The lock serializing reads from the shared random source used for masking keys.")
 
@@ -566,3 +569,230 @@ A reader closes the stream itself when it leaves."
               (close-tcp socket)
               (close (websocket-connection-stream connection)))))))
   nil)
+
+
+;;;; -- Opening Handshake --
+
+(-> websocket-upgrade-request-p (http-request) boolean)
+(defun websocket-upgrade-request-p (request)
+  "Return whether REQUEST is a GET asking to upgrade its connection to a WebSocket."
+  (and (string= (http-request-method request) "GET")
+       (http-request-header-token-p request "upgrade" "websocket")
+       (http-request-header-token-p request "connection" "upgrade")
+       t))
+
+(-> websocket-accept (stream http-request &key (:headers list) (:socket t)) websocket-connection)
+(defun websocket-accept (stream request &key headers socket)
+  "Accept the WebSocket upgrade REQUEST read from STREAM and return the server connection.
+
+Write the 101 response with the accept value and the extra (NAME . VALUE)
+HEADERS. SOCKET is the USOCKET socket under STREAM; with it, closing the
+connection wakes a thread blocked reading. Signal HTTP-REQUEST-ERROR,
+writing nothing, with status 400 for an invalid handshake and 426, with
+a Sec-WebSocket-Version header, for a version other than 13."
+  (unless (and (websocket-upgrade-request-p request)
+               (string= (http-request-version request) "HTTP/1.1"))
+    (http--fail 400 "The request is not a WebSocket upgrade."))
+  (unless (equal (http-request-header request "sec-websocket-version") "13")
+    (http--fail 426 "The WebSocket version must be 13."
+                :headers '(("Sec-WebSocket-Version" . "13"))))
+  (let ((key (http-request-header request "sec-websocket-key")))
+    (unless (and key (websocket--key-p key))
+      (http--fail 400 "The Sec-WebSocket-Key must be 16 octets in base64."))
+    (let ((response-headers (list* (cons "Upgrade" "websocket")
+                                   (cons "Connection" "Upgrade")
+                                   (cons "Sec-WebSocket-Accept" (websocket--accept-key key))
+                                   headers)))
+      (http1-write-response-head stream 101 :headers response-headers)
+      (make-instance 'websocket-connection :stream            stream
+                                           :socket            socket
+                                           :role              ':server
+                                           :handshake-headers response-headers))))
+
+(-> websocket-connect (string &key (:headers list)) websocket-connection)
+(defun websocket-connect (url &key headers)
+  "Open a WebSocket client connection to the ws:// URL and return it.
+
+HEADERS are extra (NAME . VALUE) fields for the opening request, such as
+Authorization. Signal WEBSOCKET-ERROR for an unusable URL, including
+every wss:// URL, since agentcomms has no TLS, or when the connection
+fails, and WEBSOCKET-HANDSHAKE-ERROR when the server refuses the upgrade."
+  (multiple-value-bind (host port resource authority) (websocket--parse-url url)
+    (let ((socket     (handler-case (tcp-connect host port)
+                        (error (cause)
+                          (error 'websocket-error
+                                 :message (format nil "Could not connect to ~A: ~A" url cause)))))
+          (connection nil))
+      (unwind-protect
+           (setf connection (websocket--client-handshake socket :resource  resource
+                                                                :authority authority
+                                                                :headers   headers))
+        (unless connection
+          ; mallet:suppress no-ignore-errors -- the failed handshake is reported, not the cleanup
+          (ignore-errors (close-tcp socket))))
+      connection)))
+
+(-> websocket--accept-key (string) string)
+(defun websocket--accept-key (key)
+  "Return the Sec-WebSocket-Accept value answering the handshake KEY."
+  (usb8-array-to-base64-string
+   (digest-sequence ':sha1 (string-to-octets (concatenate 'string key *websocket-accept-guid*)
+                                             :encoding ':latin-1))))
+
+(-> websocket--key-p (string) boolean)
+(defun websocket--key-p (key)
+  "Return whether KEY is the base64 encoding of 16 octets."
+  (and (= (length key) 24)
+       (handler-case (= (length (base64-string-to-usb8-array key)) 16)
+         (base64-error ()
+           nil))
+       t))
+
+(-> websocket--parse-url (string) (values string (integer 1 65535) string string))
+(defun websocket--parse-url (url)
+  "Return the host, port, resource, and Host header value of the ws:// URL.
+
+Signal WEBSOCKET-ERROR for another scheme, user information, a fragment,
+or a malformed authority."
+  (flet ((reject (message)
+           (error 'websocket-error :message (format nil "~A: ~A" message url))))
+    (let ((separator (search "://" url)))
+      (unless separator
+        (reject "The URL has no scheme"))
+      (let ((scheme    (string-downcase (subseq url 0 separator)))
+            (remainder (subseq url (+ separator 3))))
+        (cond
+          ((string= scheme "wss")
+           (reject "agentcomms has no TLS, so it cannot open a wss:// URL"))
+          ((string/= scheme "ws")
+           (reject "The URL scheme is not ws")))
+        (when (find #\# remainder)
+          (reject "A WebSocket URL cannot have a fragment"))
+        (let* ((end       (or (position-if (lambda (character) (find character "/?")) remainder)
+                              (length remainder)))
+               (authority (subseq remainder 0 end))
+               (resource  (subseq remainder end)))
+          (when (find #\@ authority)
+            (reject "The URL cannot carry user information"))
+          (multiple-value-bind (host port-text) (websocket--split-authority authority)
+            (unless (and host (plusp (length host)))
+              (reject "The URL has no host"))
+            (let ((port (if port-text
+                            (and (plusp (length port-text))
+                                 (every #'digit-char-p port-text)
+                                 (parse-integer port-text))
+                            80)))
+              (unless (and port (<= 1 port 65535))
+                (reject "The URL port is not valid"))
+              (values host
+                      port
+                      (cond
+                        ((string= resource "")
+                         "/")
+                        ((char= (char resource 0) #\?)
+                         (concatenate 'string "/" resource))
+                        (t
+                         resource))
+                      authority))))))))
+
+(-> websocket--split-authority (string) (values (or null string) (or null string)))
+(defun websocket--split-authority (authority)
+  "Return the host and port text of AUTHORITY, or NIL for a malformed bracketed host.
+
+The port text is NIL when AUTHORITY names no port."
+  (if (and (plusp (length authority)) (char= (char authority 0) #\[))
+      (let ((close (position #\] authority)))
+        (cond
+          ((null close)
+           (values nil nil))
+          ((= close (1- (length authority)))
+           (values (subseq authority 1 close) nil))
+          ((char= (char authority (1+ close)) #\:)
+           (values (subseq authority 1 close) (subseq authority (+ close 2))))
+          (t
+           (values nil nil))))
+      (let ((colon (position #\: authority)))
+        (if colon
+            (values (subseq authority 0 colon) (subseq authority (1+ colon)))
+            (values authority nil)))))
+
+(-> websocket--client-handshake
+    (t &key (:resource string) (:authority string) (:headers list))
+    websocket-connection)
+(defun websocket--client-handshake (socket &key resource authority headers)
+  "Send the opening handshake for RESOURCE on SOCKET and return the client connection.
+
+Signal WEBSOCKET-HANDSHAKE-ERROR unless the server switches protocols
+with the matching accept value and no extension or unrequested
+subprotocol."
+  (let* ((stream  (tcp-stream socket))
+         (key     (usb8-array-to-base64-string (websocket--random-octets 16)))
+         (request (append (list (cons "Host" authority)
+                                (cons "Upgrade" "websocket")
+                                (cons "Connection" "Upgrade")
+                                (cons "Sec-WebSocket-Key" key)
+                                (cons "Sec-WebSocket-Version" "13"))
+                          headers)))
+    (handler-case
+        (progn
+          (http1--write-head stream (format nil "GET ~A HTTP/1.1" resource) request)
+          (finish-output stream))
+      (stream-error (cause)
+        (error 'websocket-handshake-error
+               :message (format nil "Sending the WebSocket handshake failed: ~A" cause))))
+    (multiple-value-bind (status response) (websocket--read-response-head stream)
+      (flet ((reject (message)
+               (error 'websocket-handshake-error :status status :message message)))
+        (unless (= status 101)
+          (reject (format nil "The server answered the WebSocket handshake with status ~D." status)))
+        (unless (and (http--header-token-p response "upgrade" "websocket")
+                     (http--header-token-p response "connection" "upgrade"))
+          (reject "The server did not upgrade the connection to a WebSocket."))
+        (unless (equal (http--header-value response "sec-websocket-accept") (websocket--accept-key key))
+          (reject "The server's Sec-WebSocket-Accept does not match the key."))
+        (when (http--header-value response "sec-websocket-extensions")
+          (reject "The server selected a WebSocket extension that was not offered."))
+        (let ((protocol (http--header-value response "sec-websocket-protocol"))
+              (offered  (http--header-value request "sec-websocket-protocol")))
+          (when (and protocol
+                     (not (and offered
+                               (member protocol (http--split-list offered) :test #'string=))))
+            (reject "The server selected a subprotocol that was not offered.")))
+        (make-instance 'websocket-connection :stream            stream
+                                             :socket            socket
+                                             :role              ':client
+                                             :handshake-headers response)))))
+
+(-> websocket--read-response-head (stream) (values integer list))
+(defun websocket--read-response-head (stream)
+  "Read the status line and header fields of the handshake response on STREAM.
+
+Signal WEBSOCKET-HANDSHAKE-ERROR when the response is malformed or the
+connection ends first."
+  (handler-case
+      (multiple-value-bind (line length) (http1--read-line stream *http-maximum-header-octets*)
+        (let ((status (and line (websocket--status-line-code line))))
+          (unless status
+            (error 'websocket-handshake-error
+                   :message "The server did not answer the handshake with an HTTP/1.1 status line."))
+          (values status
+                  (http1--read-header-section stream (- *http-maximum-header-octets* length)))))
+    (http-request-error (condition)
+      (error 'websocket-handshake-error
+             :message (format nil "The handshake response is malformed: ~A" (acp-error-message condition))))
+    (stream-error (cause)
+      (error 'websocket-handshake-error
+             :message (format nil "Reading the handshake response failed: ~A" cause)))))
+
+(-> websocket--status-line-code (string) (or null (integer 100 999)))
+(defun websocket--status-line-code (line)
+  "Return the status code of the HTTP/1.x status LINE, or NIL when it is malformed."
+  (and (>= (length line) 12)
+       (string= "HTTP/1." line :end2 7)
+       (digit-char-p (char line 7))
+       (char= (char line 8) #\Space)
+       (every #'digit-char-p (subseq line 9 12))
+       (or (= (length line) 12)
+           (char= (char line 12) #\Space))
+       (char/= (char line 9) #\0)
+       (parse-integer line :start 9 :end 12)))

@@ -20,7 +20,12 @@
                 #:character-coding-error
                 #:octets-to-string
                 #:string-to-octets)
+  (:import-from #:cl-base64
+                #:base64-error
+                #:base64-string-to-usb8-array
+                #:usb8-array-to-base64-string)
   (:import-from #:ironclad
+                #:digest-sequence
                 #:random-data)
   (:import-from #:ls-compat.tcp
                 #:close-tcp
@@ -356,6 +361,8 @@
    #:*websocket-close-seconds*
    #:websocket-error
    #:websocket-error-code
+   #:websocket-handshake-error
+   #:websocket-handshake-error-status
    #:websocket-connection
    #:websocket-handshake-headers
    #:websocket-close-code
@@ -365,4 +372,7 @@
    #:websocket-send-text
    #:websocket-send-binary
    #:websocket-send-ping
-   #:websocket-close))
+   #:websocket-close
+   #:websocket-upgrade-request-p
+   #:websocket-accept
+   #:websocket-connect))

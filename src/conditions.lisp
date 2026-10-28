@@ -142,3 +142,12 @@ send before closing the connection."))
 When the peer broke the protocol, the code is the close status sent to
 it: 1002 for a protocol error, 1007 for invalid text, and 1009 for an
 oversized message."))
+
+(define-condition websocket-handshake-error (websocket-error)
+  ((status
+    :initarg       :status
+    :initform      nil
+    :reader        websocket-handshake-error-status
+    :type          (or null integer)
+    :documentation "The HTTP status the server answered with, or NIL."))
+  (:documentation "The server did not accept the WebSocket opening handshake."))

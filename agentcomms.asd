@@ -7,6 +7,7 @@
   :depends-on  (#:argo
                 #:babel
                 #:bordeaux-threads
+                #:cl-base64
                 #:ironclad
                 #:ls-compat/tcp
                 #:serapeum
