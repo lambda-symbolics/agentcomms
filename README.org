@@ -18,6 +18,7 @@ The library handles:
 - every ACP v1 method, notification, and object constructor
 - standard I/O channels for agents and a subprocess launcher for clients
 - WebSocket channels for remote agents, with an HTTP/1.1 request reader
+- a remote agent server for Streamable HTTP and WebSocket clients
 - an in-process channel pair for tests and embedded peers
 - bounded message sizes and bounded JSON documents
 
@@ -315,6 +316,50 @@ message fails the WebSocket with status 1009, and a shorter one with too
 many characters is discarded and answered with a Parse Error, as on the
 other channels.
 
+* Remote agent server
+
+=ACP-REMOTE-SERVER-START= serves an agent to remote clients under the ACP
+proposal "Streamable HTTP & WebSocket Transport". One endpoint, =/acp=,
+takes three kinds of client:
+
+- WebSocket: a GET with =Upgrade: websocket=, then one JSON-RPC message per
+  text frame.
+- Streamable HTTP: the client POSTs each message. =initialize= creates a
+  connection and answers 200 with the agent's response and an
+  =Acp-Connection-Id= header; every later request carries that header and
+  gets 202. The agent's messages arrive as Server-Sent Events on GET streams:
+  one for the connection, and one per session opened with an
+  =Acp-Session-Id= header. Responses to =session/new= and =session/load=
+  travel on the connection stream. DELETE ends the connection.
+- HTTP/2, through [[https://github.com/lambda-symbolics/llh2][llh2]], with prior knowledge or an
+  =Upgrade: h2c=. HTTP/1.1 clients are served as well, since many cleartext
+  HTTP clients cannot speak HTTP/2; their event streams end with the
+  connection.
+
+#+begin_src lisp
+(let ((server (acp:acp-remote-server-start
+               (lambda (channel) (acp:acp-agent-serve (make-instance 'my-agent) channel))
+               :host  "127.0.0.1"
+               :port  8737
+               :token "s3cret")))
+  (format t "Serving ACP at ~A~%" (acp:acp-remote-server-url server))
+  ...
+  (acp:acp-remote-server-stop server))
+#+end_src
+
+The function receives one channel per client connection, in its own thread,
+and returns when that connection ends. =:TRANSPORTS= is =(:HTTP :WEBSOCKET)=
+by default; =(:WEBSOCKET)= serves WebSocket alone. A port of 0 picks a free
+one, which =ACP-REMOTE-SERVER-PORT= reports.
+
+With =:TOKEN=, every request needs =Authorization: Bearer TOKEN= or the token
+in a =token= query parameter, or it gets 401. Requests with an =Origin=
+header get 403 unless =:ALLOWED-ORIGINS= lists it: browsers send it, so a web
+page cannot drive a local agent. The server speaks cleartext only; a
+reverse proxy adds TLS. Streamable HTTP connections without an open event
+stream or a request for =*ACP-REMOTE-IDLE-SECONDS*= end, and their sessions
+stay with the agent for a later =session/load=.
+
 * Dependencies
 
 - argo
@@ -322,6 +367,7 @@ other channels.
 - Bordeaux Threads
 - cl-base64
 - Ironclad
+- llh2
 - ls-compat (=ls-compat/tcp=)
 - Serapeum
 - usocket
