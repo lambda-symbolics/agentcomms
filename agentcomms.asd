@@ -7,7 +7,10 @@
   :depends-on  (#:argo
                 #:babel
                 #:bordeaux-threads
-                #:serapeum)
+                #:ironclad
+                #:ls-compat/tcp
+                #:serapeum
+                #:usocket)
   :components  ((:module     "src"
                  :serial     t
                  :components ((:file "package")
@@ -20,7 +23,8 @@
                               (:file "agent")
                               (:file "client")
                               (:file "stdio")
-                              (:file "http"))))
+                              (:file "http")
+                              (:file "websocket"))))
   :in-order-to ((asdf:test-op (asdf:test-op #:agentcomms/tests))))
 
 (asdf:defsystem #:agentcomms/tests
@@ -39,6 +43,7 @@
                               (:file "stdio-tests")
                               (:file "lifecycle-tests")
                               (:file "http-tests")
+                              (:file "websocket-tests")
                               (:file "tests"))))
   :perform     (asdf:test-op (operation component)
                  (declare (ignore operation component))

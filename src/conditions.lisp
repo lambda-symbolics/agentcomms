@@ -128,3 +128,17 @@ ACP-CHECK-CANCELLED signals it once the peer cancels the request."))
 
 The status and headers describe the error response the server should
 send before closing the connection."))
+
+(define-condition websocket-error (acp-error)
+  ((code
+    :initarg       :code
+    :initform      nil
+    :reader        websocket-error-code
+    :type          (or null integer)
+    :documentation "The close status code the connection failed with, or NIL."))
+  (:documentation
+   "A WebSocket connection failed or could not be opened.
+
+When the peer broke the protocol, the code is the close status sent to
+it: 1002 for a protocol error, 1007 for invalid text, and 1009 for an
+oversized message."))

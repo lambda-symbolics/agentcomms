@@ -20,6 +20,17 @@
                 #:character-coding-error
                 #:octets-to-string
                 #:string-to-octets)
+  (:import-from #:ironclad
+                #:random-data)
+  (:import-from #:ls-compat.tcp
+                #:close-tcp
+                #:tcp-accept
+                #:tcp-connect
+                #:tcp-listen
+                #:tcp-local-port
+                #:tcp-stream)
+  (:import-from #:usocket
+                #:socket-shutdown)
   (:import-from #:argo
                 #:json-error
                 #:json-false
@@ -339,4 +350,19 @@
    #:http-request-keep-alive-p
    #:http1-read-request
    #:http1-write-response
-   #:http1-write-response-head))
+   #:http1-write-response-head
+   ;; WebSocket connections
+   #:*websocket-maximum-message-octets*
+   #:*websocket-close-seconds*
+   #:websocket-error
+   #:websocket-error-code
+   #:websocket-connection
+   #:websocket-handshake-headers
+   #:websocket-close-code
+   #:websocket-close-reason
+   #:websocket-open-p
+   #:websocket-read-message
+   #:websocket-send-text
+   #:websocket-send-binary
+   #:websocket-send-ping
+   #:websocket-close))
