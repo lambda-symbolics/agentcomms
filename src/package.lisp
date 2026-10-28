@@ -16,6 +16,10 @@
                 #:thread-alive-p
                 #:with-lock-held
                 #:with-recursive-lock-held)
+  (:import-from #:babel
+                #:character-coding-error
+                #:octets-to-string
+                #:string-to-octets)
   (:import-from #:argo
                 #:json-error
                 #:json-false
@@ -26,7 +30,12 @@
                 #:make-json-limits)
   (:import-from #:serapeum
                 #:->
-                #:partial)
+                #:make-octet-vector
+                #:octet
+                #:octet-vector
+                #:partial
+                #:split-sequence
+                #:string-join)
   (:export
    ;; Conditions
    #:acp-error
@@ -309,4 +318,25 @@
    #:acp-connection-maximum-inbound-requests
    #:acp-inbound-request-thread
    #:acp-absolute-path-p
-   #:acp-validate-absolute-path))
+   #:acp-validate-absolute-path
+   ;; HTTP messages
+   #:*http-maximum-header-octets*
+   #:*http-maximum-body-octets*
+   #:http-request-error
+   #:http-request-error-status
+   #:http-request-error-headers
+   #:http-request
+   #:make-http-request
+   #:http-request-method
+   #:http-request-target
+   #:http-request-path
+   #:http-request-query
+   #:http-request-version
+   #:http-request-headers
+   #:http-request-body
+   #:http-request-header
+   #:http-request-header-token-p
+   #:http-request-keep-alive-p
+   #:http1-read-request
+   #:http1-write-response
+   #:http1-write-response-head))

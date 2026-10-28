@@ -5,6 +5,7 @@
   :version     "0.1.0"
   :serial      t
   :depends-on  (#:argo
+                #:babel
                 #:bordeaux-threads
                 #:serapeum)
   :components  ((:module     "src"
@@ -18,7 +19,8 @@
                               (:file "update-buffer")
                               (:file "agent")
                               (:file "client")
-                              (:file "stdio"))))
+                              (:file "stdio")
+                              (:file "http"))))
   :in-order-to ((asdf:test-op (asdf:test-op #:agentcomms/tests))))
 
 (asdf:defsystem #:agentcomms/tests
@@ -36,6 +38,7 @@
                               (:file "client-tests")
                               (:file "stdio-tests")
                               (:file "lifecycle-tests")
+                              (:file "http-tests")
                               (:file "tests"))))
   :perform     (asdf:test-op (operation component)
                  (declare (ignore operation component))

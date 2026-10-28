@@ -106,3 +106,25 @@ ACP-CHECK-CANCELLED signals it once the peer cancels the request."))
 (define-condition acp-state-error (acp-error)
   ()
   (:documentation "An operation ran outside the lifecycle state that allows it."))
+
+(define-condition http-request-error (acp-error)
+  ((status
+    :initarg       :status
+    :reader        http-request-error-status
+    :type          integer
+    :documentation "The HTTP status code the server should answer with.")
+   (headers
+    :initarg       :headers
+    :initform      nil
+    :reader        http-request-error-headers
+    :type          list
+    :documentation "Header fields, as (NAME . VALUE) strings, for that answer."))
+  (:report (lambda (condition stream)
+             (format stream "~A (HTTP status ~D)"
+                     (acp-error-message condition)
+                     (http-request-error-status condition))))
+  (:documentation
+   "An HTTP request could not be accepted.
+
+The status and headers describe the error response the server should
+send before closing the connection."))
