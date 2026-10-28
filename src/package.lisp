@@ -375,4 +375,9 @@
    #:websocket-close
    #:websocket-upgrade-request-p
    #:websocket-accept
-   #:websocket-connect))
+   #:websocket-connect
+   ;; ACP over WebSocket
+   #:acp-websocket-channel
+   #:acp-websocket-channel-websocket
+   #:make-acp-websocket-channel
+   #:acp-websocket-connect))

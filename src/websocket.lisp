@@ -796,3 +796,80 @@ connection ends first."
            (char= (char line 12) #\Space))
        (char/= (char line 9) #\0)
        (parse-integer line :start 9 :end 12)))
+
+
+;;;; -- ACP WebSocket Channels --
+
+(defclass acp-websocket-channel (acp-channel)
+  ((websocket
+    :initarg       :websocket
+    :reader        acp-websocket-channel-websocket
+    :type          websocket-connection
+    :documentation "The WebSocket connection carrying one JSON-RPC message per text message."))
+  (:documentation
+   "A channel carrying each ACP message as one WebSocket text message.
+
+Binary messages are ignored, as the ACP remote transport specifies."))
+
+(-> make-acp-websocket-channel (websocket-connection &key (:maximum-message-characters integer))
+    acp-websocket-channel)
+(defun make-acp-websocket-channel
+    (websocket &key (maximum-message-characters *acp-maximum-message-characters*))
+  "Return a channel carrying ACP messages over the open WEBSOCKET connection.
+
+Use it on either end: after WEBSOCKET-ACCEPT on a server or
+WEBSOCKET-CONNECT on a client."
+  (make-instance 'acp-websocket-channel
+                 :websocket                  websocket
+                 :maximum-message-characters maximum-message-characters))
+
+(-> acp-websocket-connect
+    (string &key (:headers list) (:maximum-message-characters integer))
+    acp-websocket-channel)
+(defun acp-websocket-connect (url &key headers
+                                       (maximum-message-characters *acp-maximum-message-characters*))
+  "Connect to the ACP agent at the ws:// URL and return the channel.
+
+HEADERS are extra fields for the opening request. Attach a client with
+ACP-CLIENT-CONNECT and close the connection to close the WebSocket."
+  (make-acp-websocket-channel (websocket-connect url :headers headers)
+                              :maximum-message-characters maximum-message-characters))
+
+(defmethod channel-read-message ((channel acp-websocket-channel))
+  "Return the next text message, skipping binary ones, or NIL once the WebSocket closes.
+
+A message longer than the channel's limit signals ACP-MESSAGE-TOO-LARGE;
+one longer than four octets per allowed character also fails the
+WebSocket with status 1009."
+  (let ((limit (channel-maximum-message-characters channel)))
+    (loop
+      (multiple-value-bind (message kind)
+          (handler-case
+              (websocket-read-message (acp-websocket-channel-websocket channel)
+                                      :maximum-octets (* 4 limit))
+            (websocket-error (condition)
+              (if (eql (websocket-error-code condition) 1009)
+                  (error 'acp-message-too-large
+                         :message (format nil "The incoming message exceeds ~D characters." limit)
+                         :limit   limit)
+                  (error condition))))
+        (case kind
+          ((nil)
+           (return nil))
+          (:text
+           (channel--check-length channel message)
+           (return message)))))))
+
+(defmethod channel-write-message ((channel acp-websocket-channel) text)
+  "Send TEXT as one text message."
+  (channel--check-length channel text)
+  (websocket-send-text (acp-websocket-channel-websocket channel) text))
+
+(defmethod channel-open-p ((channel acp-websocket-channel))
+  "Return whether the WebSocket is open."
+  (websocket-open-p (acp-websocket-channel-websocket channel)))
+
+(defmethod channel-close ((channel acp-websocket-channel))
+  "Close the WebSocket with status 1000."
+  (websocket-close (acp-websocket-channel-websocket channel))
+  nil)

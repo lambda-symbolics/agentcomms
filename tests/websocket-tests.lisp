@@ -379,3 +379,68 @@ Acp-Connection-Id: conn-1
          (test-equal status
                      (websocket-handshake-error-status
                       (test-signals websocket-handshake-error (websocket-connect url)))))))))
+
+
+;;;; -- ACP over WebSocket Tests --
+
+(define-test websocket-channel-message-bounds
+  (test-call-with-socket-pair
+   (lambda (client server)
+     (let ((channel (make-acp-websocket-channel (test-websocket server ':server)
+                                                :maximum-message-characters 4)))
+       (test-send-frames client '((:binary (1 2 3)) (:text "abcde") (:text "ok") (:text "∑∑∑∑")))
+       (test-equal 4 (acp-message-too-large-limit
+                      (test-signals acp-message-too-large (channel-read-message channel))))
+       (test-equal "ok" (channel-read-message channel))
+       (test-equal "∑∑∑∑" (channel-read-message channel))
+       (test-signals acp-message-too-large (channel-write-message channel "large"))
+       (test-send-frames client '((:text "0123456789abcdefg")))
+       (test-signals acp-message-too-large (channel-read-message channel))
+       (test-equal 1009 (test-close-frame-code (test-receive-frame client)))
+       (test-equal nil (channel-read-message channel))
+       (test-assert (not (channel-open-p channel)))
+       (test-signals acp-connection-closed (channel-write-message channel "late"))
+       (channel-close channel)
+       (channel-close channel)))))
+
+(define-test websocket-acp-agent-and-client
+  (let ((agent        (make-instance 'test-tooling-agent))
+        (client       (make-instance 'test-client))
+        (agent-closed nil))
+    (test-call-with-websocket-server
+     (lambda (socket)
+       (let* ((stream  (tcp-stream socket))
+              (request (http1-read-request stream)))
+         (acp-agent-serve agent
+                          (make-acp-websocket-channel
+                           (websocket-accept stream request :headers '(("Acp-Connection-Id" . "conn-1"))
+                                                            :socket  socket)))
+         (setf agent-closed t)))
+     (lambda (url)
+       (let ((channel (acp-websocket-connect url)))
+         (test-equal "conn-1"
+                     (http--header-value (websocket-handshake-headers (acp-websocket-channel-websocket channel))
+                                         "acp-connection-id"))
+         (acp-client-connect client channel :name "websocket client")
+         (unwind-protect
+              (progn
+                (client-initialize client)
+                (test-equal "test-agent" (json-get (acp-client-agent-info client) "name"))
+                (test-equal "sess-1" (client-new-session client "/w"))
+                (test-equal ':refusal (client-prompt client "sess-1" (list (acp-text-content "nothing ∑"))))
+                (test-equal ':end-turn (client-prompt client "sess-1" (list (acp-text-content "hello"))))
+                (test-equal '("Hi there") (test-client-texts client))
+                (test-equal ':end-turn (client-prompt client "sess-1" (list (acp-text-content "write"))))
+                (test-equal '(("/w/out.txt" . "written")) (test-client-writes client))
+                (let ((thread (make-thread
+                               (lambda ()
+                                 (client-prompt client "sess-1" (list (acp-text-content "slow")))))))
+                  (test-assert (test-wait-until
+                                (lambda ()
+                                  (acp-agent-session-prompt-active-p (acp-agent-session agent "sess-1")))))
+                  (client-cancel client "sess-1")
+                  (test-equal ':cancelled (join-thread thread))))
+           (connection-close (acp-client-connection client)))
+         (test-assert (test-wait-until (lambda () agent-closed))
+                      "the agent's connection ends when the client closes")
+         (test-equal 1000 (websocket-close-code (acp-websocket-channel-websocket channel))))))))
