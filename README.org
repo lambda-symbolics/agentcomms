@@ -17,6 +17,7 @@ The library handles:
 - protocol version negotiation and capability gating on both sides
 - every ACP v1 method, notification, and object constructor
 - standard I/O channels for agents and a subprocess launcher for clients
+- WebSocket channels for remote agents, with an HTTP/1.1 request reader
 - an in-process channel pair for tests and embedded peers
 - bounded message sizes and bounded JSON documents
 
@@ -208,16 +209,122 @@ honor cancellation.
 Channels carry message lines. =ACP-STANDARD-IO-CHANNEL= wraps this
 process's standard streams as UTF-8, =ACP-LAUNCH-AGENT= wraps a subprocess,
 =MAKE-ACP-STREAM-CHANNEL= wraps any pair of character streams, and
-=MAKE-ACP-CHANNEL-PAIR= returns two connected in-memory channels. Every
-channel bounds its messages at =*ACP-MAXIMUM-MESSAGE-CHARACTERS*=, 16 MiB
-by default; longer incoming messages are discarded and answered with a
-Parse Error.
+=MAKE-ACP-CHANNEL-PAIR= returns two connected in-memory channels, and
+=MAKE-ACP-WEBSOCKET-CHANNEL= and =ACP-WEBSOCKET-CONNECT= carry messages over
+a WebSocket. Every channel bounds its messages at
+=*ACP-MAXIMUM-MESSAGE-CHARACTERS*=, 16 MiB by default; longer incoming
+messages are discarded and answered with a Parse Error.
+
+* HTTP/1.1 messages
+
+=HTTP1-READ-REQUEST= reads one request from a binary stream and returns an
+=HTTP-REQUEST=, or =NIL= when the input ends before the request starts. It
+accepts HTTP/1.0 and HTTP/1.1, CRLF or bare LF line ends, and bodies framed
+by =Content-Length= or chunked =Transfer-Encoding=. The head is limited to
+=*HTTP-MAXIMUM-HEADER-OCTETS*= and the body to =*HTTP-MAXIMUM-BODY-OCTETS*=;
+both limits are also keyword arguments. When the request has
+=Expect: 100-continue= and the stream is also an output stream, the reader
+sends the interim response before it reads the body.
+
+A request it cannot accept signals =HTTP-REQUEST-ERROR=.
+=HTTP-REQUEST-ERROR-STATUS= is the status to answer with: 400 for a
+malformed request, 413 for a large body, 431 for a large head, 501 for an
+unknown transfer coding, and 505 for another protocol version.
+=HTTP-REQUEST-ERROR-HEADERS= lists header fields that belong in that answer.
+
+The HTTP/2 connection preface starts like a request. When the request line
+is =PRI * HTTP/2.0=, the reader returns that request after the empty line
+that follows it and reads nothing more, so the caller can read the rest of
+the preface and switch protocols.
+
+=MAKE-HTTP-REQUEST= builds the same object from parts, for requests that
+arrive another way. The readers are =HTTP-REQUEST-METHOD=,
+=HTTP-REQUEST-TARGET=, =HTTP-REQUEST-PATH= (the target without its query),
+=HTTP-REQUEST-QUERY= (decoded name and value pairs), =HTTP-REQUEST-VERSION=,
+=HTTP-REQUEST-HEADERS= (lowercase names in arrival order), and
+=HTTP-REQUEST-BODY= (octets). =HTTP-REQUEST-HEADER= returns one field and
+joins repeated fields with a comma, =HTTP-REQUEST-HEADER-TOKEN-P= tests a
+comma-separated field such as =Connection= for a token, and
+=HTTP-REQUEST-KEEP-ALIVE-P= tells whether the connection stays open after
+the response.
+
+=HTTP1-WRITE-RESPONSE= writes a status line, header fields, a computed
+=Content-Length=, and a body given as octets or a UTF-8 string.
+=HTTP1-WRITE-RESPONSE-HEAD= writes only the status line and header fields,
+for 101 responses and for bodies that end when the connection closes, such
+as Server-Sent Events.
+
+#+begin_src lisp
+(let ((request (acp:http1-read-request stream)))
+  (when request
+    (acp:http1-write-response stream 200
+                              :headers '(("Content-Type" . "text/plain"))
+                              :body    "ready")))
+#+end_src
+
+* WebSocket
+
+The WebSocket layer follows RFC 6455 without extensions or TLS. On a
+server, =WEBSOCKET-UPGRADE-REQUEST-P= recognizes an upgrade request and
+=WEBSOCKET-ACCEPT= checks it, writes the 101 response with any extra header
+fields, and returns a =WEBSOCKET-CONNECTION=. An invalid handshake signals
+=HTTP-REQUEST-ERROR= before anything is written, with status 426 and a
+=Sec-WebSocket-Version= header for an unsupported version and 400
+otherwise. Pass the socket as =:SOCKET= so that closing the connection can
+wake a thread blocked reading it.
+
+#+begin_src lisp
+(let* ((socket  (ls-compat.tcp:tcp-accept listener))
+       (stream  (ls-compat.tcp:tcp-stream socket))
+       (request (acp:http1-read-request stream)))
+  (if (acp:websocket-upgrade-request-p request)
+      (acp:acp-agent-serve agent
+                           (acp:make-acp-websocket-channel
+                            (acp:websocket-accept stream request
+                                                  :headers '(("Acp-Connection-Id" . "c-1"))
+                                                  :socket  socket)))
+      (acp:http1-write-response stream 404)))
+#+end_src
+
+On a client, =WEBSOCKET-CONNECT= opens a =ws://= URL with extra request
+headers such as =Authorization=, and =ACP-WEBSOCKET-CONNECT= returns an ACP
+channel for =ACP-CLIENT-CONNECT=. A =wss://= URL signals =WEBSOCKET-ERROR=;
+put a TLS proxy in front instead. A refused handshake signals
+=WEBSOCKET-HANDSHAKE-ERROR= with the server's status in
+=WEBSOCKET-HANDSHAKE-ERROR-STATUS=. =WEBSOCKET-HANDSHAKE-HEADERS= holds the
+101 response's header fields.
+
+=WEBSOCKET-READ-MESSAGE= returns the next text message as a string or binary
+message as octets, with =:TEXT= or =:BINARY= as a second value, and =NIL=
+after the close handshake or the end of the stream. It answers pings,
+reassembles fragments, and fails the connection on a protocol error (status
+1002), invalid UTF-8 text (1007), or a message longer than
+=*WEBSOCKET-MAXIMUM-MESSAGE-OCTETS*= (1009); the failure signals
+=WEBSOCKET-ERROR= with that status in =WEBSOCKET-ERROR-CODE=.
+=WEBSOCKET-SEND-TEXT=, =WEBSOCKET-SEND-BINARY=, and =WEBSOCKET-SEND-PING=
+send one frame each and may run on several threads while one thread reads.
+
+=WEBSOCKET-CLOSE= sends a close frame. While another thread reads, it waits
+up to =*WEBSOCKET-CLOSE-SECONDS*= for the peer's close frame, then shuts the
+socket down. =WEBSOCKET-CLOSE-CODE= and =WEBSOCKET-CLOSE-REASON= report how
+the connection ended.
+
+The ACP channel sends each message as one text frame and ignores binary
+messages. Its read limit is four octets per allowed character: a longer
+message fails the WebSocket with status 1009, and a shorter one with too
+many characters is discarded and answered with a Parse Error, as on the
+other channels.
 
 * Dependencies
 
 - argo
+- babel
 - Bordeaux Threads
+- cl-base64
+- Ironclad
+- ls-compat (=ls-compat/tcp=)
 - Serapeum
+- usocket
 - ASDF/UIOP
 
 The protocol types follow the upstream schema at
