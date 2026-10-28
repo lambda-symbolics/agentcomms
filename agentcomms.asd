@@ -9,6 +9,7 @@
                 #:bordeaux-threads
                 #:cl-base64
                 #:ironclad
+                #:llh2
                 #:ls-compat/tcp
                 #:serapeum
                 #:usocket)
@@ -25,7 +26,8 @@
                               (:file "client")
                               (:file "stdio")
                               (:file "http")
-                              (:file "websocket"))))
+                              (:file "websocket")
+                              (:file "remote"))))
   :in-order-to ((asdf:test-op (asdf:test-op #:agentcomms/tests))))
 
 (asdf:defsystem #:agentcomms/tests
@@ -45,6 +47,7 @@
                               (:file "lifecycle-tests")
                               (:file "http-tests")
                               (:file "websocket-tests")
+                              (:file "remote-tests")
                               (:file "tests"))))
   :perform     (asdf:test-op (operation component)
                  (declare (ignore operation component))

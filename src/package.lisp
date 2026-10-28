@@ -25,8 +25,23 @@
                 #:base64-string-to-usb8-array
                 #:usb8-array-to-base64-string)
   (:import-from #:ironclad
+                #:constant-time-equal
                 #:digest-sequence
                 #:random-data)
+  (:import-from #:llh2
+                #:h2-connection-serve
+                #:h2-error
+                #:h2-stream
+                #:h2-stream-authority
+                #:h2-stream-finish
+                #:h2-stream-headers
+                #:h2-stream-method
+                #:h2-stream-path
+                #:h2-stream-read-body
+                #:h2-stream-respond
+                #:h2-stream-send-headers
+                #:h2-stream-write-data
+                #:make-h2-server-connection)
   (:import-from #:ls-compat.tcp
                 #:close-tcp
                 #:tcp-accept
@@ -35,7 +50,8 @@
                 #:tcp-local-port
                 #:tcp-stream)
   (:import-from #:usocket
-                #:socket-shutdown)
+                #:socket-shutdown
+                #:wait-for-input)
   (:import-from #:argo
                 #:json-error
                 #:json-false
@@ -380,4 +396,14 @@
    #:acp-websocket-channel
    #:acp-websocket-channel-websocket
    #:make-acp-websocket-channel
-   #:acp-websocket-connect))
+   #:acp-websocket-connect
+   ;; Remote transport server
+   #:*acp-remote-default-port*
+   #:*acp-remote-idle-seconds*
+   #:*acp-remote-path*
+   #:acp-remote-server
+   #:acp-remote-server-host
+   #:acp-remote-server-port
+   #:acp-remote-server-start
+   #:acp-remote-server-stop
+   #:acp-remote-server-url))
