@@ -216,10 +216,7 @@ OCTETS is a string sent as UTF-8 or a sequence of octets."
                   (test-equal 1001 (test-close-frame-code frame))
                   (test-equal "going away"
                               (octets-to-string (websocket-frame-payload frame) :start 2)))
-                (test-equal (if reply-p
-                                1001
-                                1006)
-                            (websocket-close-code websocket))
+                (test-equal 1001 (websocket-close-code websocket))
                 (when reply-p
                   (test-assert (< (- (get-internal-real-time) start) (* 1/2 internal-time-units-per-second))
                                "the reply ends the wait"))

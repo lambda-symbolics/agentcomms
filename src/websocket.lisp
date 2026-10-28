@@ -209,7 +209,8 @@ Signal WEBSOCKET-ERROR with code 1002 when a 64-bit length sets its top bit."
     :initform      nil
     :accessor      websocket-close-code
     :type          (or null integer)
-    :documentation "The close status the connection ended with, or NIL while open.")
+    :documentation "The peer's close status, else the one this side sent or failed with,
+else 1006 for a connection that ended without a close frame; NIL while open.")
    (close-reason
     :initform      nil
     :accessor      websocket-close-reason
@@ -342,7 +343,10 @@ twice is harmless. REASON is cut to the 123 octets a close frame holds."
                        (< (get-internal-real-time) deadline))
             do (condition-wait (websocket-connection-condition connection) lock
                                :timeout (/ (- deadline (get-internal-real-time))
-                                           internal-time-units-per-second)))))
+                                           internal-time-units-per-second)))
+      (unless (websocket-close-code connection)
+        (setf (websocket-close-code connection)   code
+              (websocket-close-reason connection) reason))))
   (websocket--release connection)
   nil)
 
