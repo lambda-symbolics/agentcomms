@@ -48,6 +48,7 @@
                               (:file "http-tests")
                               (:file "websocket-tests")
                               (:file "remote-tests")
+                              (:file "remote-shutdown-tests")
                               (:file "tests"))))
   :perform     (asdf:test-op (operation component)
                  (declare (ignore operation component))

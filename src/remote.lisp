@@ -341,11 +341,10 @@ ALLOWED-ORIGINS are refused, so web pages cannot reach the agent."
 
 (-> remote--spawn (acp-remote-server function string) null)
 (defun remote--spawn (server function name)
-  "Run FUNCTION in a new thread named NAME that ACP-REMOTE-SERVER-STOP waits for."
-  (bt2:with-lock-held ((acp-remote-server--lock server))
-    (setf (acp-remote-server--workers server)
-          (cons (bt2:make-thread function :name name)
-                (remove-if-not #'bt2:thread-alive-p (acp-remote-server--workers server)))))
+  "Run FUNCTION in a tracked thread named NAME; hold the server lock during admission."
+  (setf (acp-remote-server--workers server)
+        (cons (bt2:make-thread function :name name)
+              (remove-if-not #'bt2:thread-alive-p (acp-remote-server--workers server))))
   nil)
 
 (-> acp-remote-server-url (acp-remote-server &key (:scheme string)) string)
@@ -386,10 +385,20 @@ socket does not wake a thread blocked accepting on it."
                                     (error ()
                                       nil))))
                       (when socket
-                        (bt2:with-lock-held ((acp-remote-server--lock server))
-                          (push socket (acp-remote-server--sockets server)))
-                        (remote--spawn server (lambda () (remote--serve-socket server socket))
-                                       "agentcomms remote socket")))))
+                        (let ((admitted-p nil))
+                          (unwind-protect
+                               (bt2:with-lock-held ((acp-remote-server--lock server))
+                                 (unless (acp-remote-server--stopped-p server)
+                                   (push socket (acp-remote-server--sockets server))
+                                   (remote--spawn server (lambda () (remote--serve-socket server socket))
+                                                  "agentcomms remote socket")
+                                   (setf admitted-p t)))
+                            (unless admitted-p
+                              (bt2:with-lock-held ((acp-remote-server--lock server))
+                                (setf (acp-remote-server--sockets server)
+                                      (remove socket (acp-remote-server--sockets server))))
+                              (remote--shut-down-socket socket)
+                              (close-tcp socket))))))))
       (handler-case (close-tcp listener)
         (error ()
           nil))))
@@ -401,6 +410,8 @@ socket does not wake a thread blocked accepting on it."
   (loop
     (let ((idle nil))
       (bt2:with-lock-held ((acp-remote-server--lock server))
+        (when (acp-remote-server--stopped-p server)
+          (return))
         (bt2:condition-wait (acp-remote-server--condition server) (acp-remote-server--lock server)
                             :timeout 30)
         (when (acp-remote-server--stopped-p server)
@@ -702,13 +713,12 @@ socket does not wake a thread blocked accepting on it."
     (unless (and (equal (json-get message "method") "initialize") id)
       (remote--respond exchange 400 "A request without Acp-Connection-Id must be initialize.")
       (return-from remote--initialize nil))
-    (multiple-value-bind (connection agent-channel) (remote--open-connection server)
+    (let ((connection (remote--open-connection server)))
+      (unless connection
+        (remote--respond exchange 503 "The ACP server is stopping.")
+        (return-from remote--initialize nil))
       (bt2:with-lock-held ((acp-remote-server--lock server))
         (setf (gethash id (acp-remote-connection--waiters connection)) ':pending))
-      (remote--spawn server (lambda () (remote--run-agent server connection agent-channel))
-                     "agentcomms remote agent")
-      (remote--spawn server (lambda () (remote--pump server connection))
-                     "agentcomms remote pump")
       (handler-case (channel-write-message (acp-remote-connection--channel connection) text)
         (acp-error ()
           nil))
@@ -735,17 +745,28 @@ socket does not wake a thread blocked accepting on it."
               (remote--respond exchange 504 "The agent did not answer initialize."))))))
   nil)
 
-(-> remote--open-connection (acp-remote-server) (values acp-remote-connection acp-channel))
+(-> remote--open-connection (acp-remote-server) (or null acp-remote-connection))
 (defun remote--open-connection (server)
-  "Register a new HTTP connection; return it and the channel end its agent serves."
+  "Register an HTTP connection and its workers atomically, or return NIL when stopping."
   (multiple-value-bind (agent-channel transport-channel)
       (make-acp-channel-pair :maximum-message-characters (acp-remote-server-maximum-message-characters server))
     (let ((connection (make-instance 'acp-remote-connection :id      (remote--new-id)
-                                                            :channel transport-channel)))
-      (bt2:with-lock-held ((acp-remote-server--lock server))
-        (setf (gethash (acp-remote-connection-id connection) (acp-remote-server--connections server))
-              connection))
-      (values connection agent-channel))))
+                                                            :channel transport-channel))
+          (admitted-p nil))
+      (unwind-protect
+           (bt2:with-lock-held ((acp-remote-server--lock server))
+             (unless (acp-remote-server--stopped-p server)
+               (setf (gethash (acp-remote-connection-id connection) (acp-remote-server--connections server))
+                     connection)
+               (remote--spawn server (lambda () (remote--run-agent server connection agent-channel))
+                              "agentcomms remote agent")
+               (remote--spawn server (lambda () (remote--pump server connection))
+                              "agentcomms remote pump")
+               (setf admitted-p t)
+               connection))
+        (unless admitted-p
+          (remote--end-connection server connection)
+          (channel-close agent-channel))))))
 
 (-> remote--run-agent (acp-remote-server acp-remote-connection acp-channel) null)
 (defun remote--run-agent (server connection channel)
