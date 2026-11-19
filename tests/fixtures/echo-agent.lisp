@@ -1,6 +1,6 @@
 ;;;; -- Echo Agent --
 
-;;; A minimal ACP agent in plain JSON, used to test the subprocess channel.
+;;; A minimal ACP agent in plain JSON, for testing the subprocess channel.
 ;;; Run with: sbcl --script echo-agent.lisp /path/to/.qlot/setup.lisp
 
 (require '#:asdf)

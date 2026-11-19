@@ -3,10 +3,10 @@
 ;;;; -- Agent Role --
 
 (defparameter *acp-agent-implementation-name* "agentcomms"
-  "The implementation name an agent reports unless it overrides AGENT-IMPLEMENTATION.")
+  "The implementation name reported by the agent unless it is overriden with AGENT-IMPLEMENTATION.")
 
 (defparameter *acp-agent-implementation-version* "0.1.0"
-  "The implementation version an agent reports unless it overrides AGENT-IMPLEMENTATION.")
+  "The implementation version reported by the agent reports unless it is overriden with AGENT-IMPLEMENTATION.")
 
 (define-condition acp-prompt-cancelled (acp-error)
   ()
@@ -14,9 +14,9 @@
   (:documentation
    "The client cancelled the prompt turn in progress.
 
-AGENT-CHECK-CANCELLED signals it, and AGENT-PROMPT implementations may
-signal it themselves; the agent answers the prompt with the cancelled stop
-reason either way."))
+This is signalled by AGENT-CHECK-CANCELLED, and AGENT-PROMPT implementations may
+signal it themselves; either way, the agent will answer the prompt with the cancelled stop
+reason."))
 
 
 ;;;; -- Sessions --
@@ -24,10 +24,10 @@ reason either way."))
 (defclass acp-agent-session ()
   ((identifier
     :initarg :identifier :reader acp-agent-session-identifier :type string
-    :documentation "The session id the agent chose.")
+    :documentation "The session id selected by the agent.")
    (working-directory
     :initarg :working-directory :reader acp-agent-session-working-directory :type string
-    :documentation "The absolute working directory the client requested.")
+    :documentation "The absolute working directory requested by the client.")
    (cancel-requested-p
     :initform nil :accessor acp-agent-session-cancel-requested-p :type boolean
     :documentation "Whether session/cancel arrived during the current prompt.")
@@ -39,7 +39,7 @@ reason either way."))
     :documentation "The completion wait used by the serialized close operation.")
    (closing-p
     :initform nil :accessor acp-agent-session-closing-p :type boolean
-    :documentation "Whether close has stopped prompt admission.")
+    :documentation "Whether a closure has stopped prompt admission.")
    (control-lock
     :initform (make-lock "agentcomms prompt control") :reader acp-agent-session-control-lock
     :documentation "The lock ordering prompt admission, finalization and cancellation hooks.")
@@ -56,27 +56,27 @@ reason either way."))
     :initform      nil
     :accessor      acp-agent-connection
     :type          (or null acp-connection)
-    :documentation "The connection to the client once attached.")
+    :documentation "The connection to the client (once it is attached).")
    (protocol-version
     :initform      nil
     :accessor      acp-agent-protocol-version
     :type          (or null integer)
-    :documentation "The negotiated protocol version, or NIL before initialize.")
+    :documentation "The negotiated protocol version. NIL before initialization.")
    (client-capabilities
     :initform      nil
     :accessor      acp-agent-client-capabilities
     :type          t
-    :documentation "The client capabilities object received in initialize.")
+    :documentation "The client capabilities object received during initialization.")
    (client-info
     :initform      nil
     :accessor      acp-agent-client-info
     :type          t
-    :documentation "The client implementation descriptor, when provided.")
+    :documentation "The client implementation descriptor (when provided).")
    (advertised-capabilities
     :initform      nil
     :accessor      acp-agent-advertised-capabilities
     :type          t
-    :documentation "The capabilities this agent reported in its initialize response.")
+    :documentation "The capabilities reported by this agent in its initialize response.")
    (sessions
     :initform      (make-hash-table :test #'equal)
     :reader        acp-agent-sessions
@@ -104,7 +104,7 @@ cancellation into the cancelled stop reason."))
     acp-connection)
 (defun acp-agent-connect (agent channel &key (name "agentcomms agent") log-function
                                           (request-timeout *acp-default-request-timeout*))
-  "Attach AGENT to CHANNEL and return the running connection."
+  "Attach AGENT to CHANNEL. Returns the running connection."
   (let ((connection (make-acp-connection :channel         channel
                                          :peer            agent
                                          :name            name
@@ -116,14 +116,14 @@ cancellation into the cancelled stop reason."))
 (-> acp-agent-serve (acp-agent acp-channel &key (:name string) (:log-function (or null function)))
     (or null string))
 (defun acp-agent-serve (agent channel &key (name "agentcomms agent") log-function)
-  "Serve AGENT over CHANNEL until the client disconnects; return the close reason."
+  "Serve AGENT over CHANNEL until the client disconnects. Returns the close reason."
   (connection-run (acp-agent-connect agent channel :name name :log-function log-function)))
 
 (-> agent--connection (acp-agent) acp-connection)
 (defun agent--connection (agent)
-  "Return AGENT's connection or signal that it is not attached."
+  "Return AGENT's connection, or signal that it is not attached."
   (or (acp-agent-connection agent)
-      (error 'acp-state-error :message "The agent is not attached to a connection.")))
+      (error 'acp-state-error :message "The agent is not attached to any connection.")))
 
 
 ;;;; -- Generic Functions for Agent Implementations --
@@ -155,7 +155,7 @@ configOptions."))
 
 (defgeneric agent-load-session (agent &key session-id cwd mcp-servers additional-directories params)
   (:documentation
-   "Restore SESSION-ID, replaying its history through AGENT-SEND-UPDATE before returning.
+   "Restore SESSION-ID, replaying its history through AGENT-SEND-UPDATE, and then return.
 
 Return NIL or a JSON object of response extras."))
 
@@ -191,9 +191,9 @@ the complete list of configuration options with their current values."))
 
 (defgeneric agent-list-sessions (agent &key cwd cursor params)
   (:documentation
-   "Return the list of session info objects, filtered by CWD when given.
+   "Return the list of session info objects, filtered by CWD, if given.
 
-Return a second value naming the next page cursor when more sessions exist."))
+Return a second value with the next page cursor when more sessions exist."))
 
 (defgeneric agent-delete-session (agent session-id params)
   (:documentation "Remove SESSION-ID from future session lists."))
@@ -202,7 +202,7 @@ Return a second value naming the next page cursor when more sessions exist."))
   (:documentation "End the authenticated state."))
 
 (defgeneric agent-extension-request (agent method params)
-  (:documentation "Answer the extension request METHOD, whose name begins with an underscore."))
+  (:documentation "Answer the extension request METHOD. The extension's name begins with an underscore."))
 
 (defgeneric agent-extension-notification (agent method params)
   (:documentation "React to the extension notification METHOD."))
@@ -224,11 +224,11 @@ Return a second value naming the next page cursor when more sessions exist."))
   nil)
 
 (defmethod agent-implementation ((agent acp-agent))
-  "Report the library's own name and version."
+  "Report the library's name and version."
   (acp-implementation *acp-agent-implementation-name* *acp-agent-implementation-version*))
 
 (defmethod agent-capabilities ((agent acp-agent))
-  "Advertise only the baseline methods."
+  "Advertise baseline methods only."
   (acp-agent-capabilities))
 
 (defmethod agent-auth-methods ((agent acp-agent))
@@ -236,7 +236,7 @@ Return a second value naming the next page cursor when more sessions exist."))
   nil)
 
 (defmethod agent-authenticate ((agent acp-agent) method-id params)
-  "Reject every method id, since none is advertised by default."
+  "Reject every method id, as none are advertised by default."
   (declare (ignore params))
   (acp-invalid-params "~A is not an advertised authentication method." method-id))
 
@@ -263,7 +263,7 @@ Return a second value naming the next page cursor when more sessions exist."))
   (agent--unimplemented "session/resume"))
 
 (defmethod agent-close-session ((agent acp-agent) session-id params)
-  "Do nothing beyond the library's bookkeeping."
+  "Do nothing except the library's standard bookkeeping."
   (declare (ignore session-id params))
   nil)
 
@@ -273,7 +273,7 @@ Return a second value naming the next page cursor when more sessions exist."))
   (agent--unimplemented "session/prompt"))
 
 (defmethod agent-cancel ((agent acp-agent) session-id)
-  "Rely on the cancellation flag the library already set."
+  "Rely on the cancellation flag already set by the library."
   (declare (ignore session-id))
   nil)
 
@@ -493,7 +493,7 @@ Return a second value naming the next page cursor when more sessions exist."))
 (-> agent--close-session (acp-agent acp-agent-session hash-table) null)
 (-> agent--cancel-session (acp-agent acp-agent-session &key (:closing-p boolean)) null)
 (defun agent--cancel-session (agent session &key closing-p)
-  "Cancel only the active prompt while excluding a later prompt's admission."
+  "Cancel the active prompt, and exclude admission of later prompts."
   (with-lock-held ((acp-agent-session-control-lock session))
     (let ((active-p nil))
       (with-lock-held ((acp-agent-lock agent))
@@ -530,7 +530,7 @@ Return a second value naming the next page cursor when more sessions exist."))
     (cond
       ((equal type "boolean")
        (unless (or (eq value t) (json-false-p value))
-         (acp-invalid-params "A boolean option takes a boolean value."))
+         (acp-invalid-params "A boolean option requires boolean value."))
        (eq value t))
       ((stringp value)
        value)
@@ -677,7 +677,7 @@ Return a second value naming the next page cursor when more sessions exist."))
 
 (-> agent-client-request (acp-agent string t &key (:timeout (or null real))) t)
 (defun agent-client-request (agent method params &key (timeout nil timeout-p))
-  "Send request METHOD with PARAMS to the client and return its result."
+  "Send request METHOD with PARAMS to the client and return the result."
   (let ((connection (agent--connection agent)))
     (if timeout-p
         (connection-request connection method params :timeout timeout)
@@ -784,7 +784,7 @@ id. TOOL-CALL is a tool call or tool call update object."
     (agent session-id command &key arguments environment cwd output-byte-limit)
   "Start COMMAND in a client terminal and return the terminal id.
 
-ENVIRONMENT is a list of (NAME . VALUE) strings."
+ENVIRONMENT is a list of (NAME . VALUE) strings pairs."
   (when cwd (acp-validate-absolute-path cwd "cwd"))
   (agent--require-client-capability agent "terminal")
   (let ((result
@@ -804,13 +804,13 @@ ENVIRONMENT is a list of (NAME . VALUE) strings."
     (let ((terminal-id (json-get result "terminalId")))
       (unless (stringp terminal-id)
         (error 'acp-protocol-error :message
-               "The terminal creation response lacks a terminalId." :payload
+               "The terminal creation response is missing a terminalId." :payload
                (bounded-diagnostic result)))
       terminal-id)))
 
 (-> agent--exit-status (t) (values boolean (or null integer) (or null string)))
 (defun agent--exit-status (status)
-  "Return whether STATUS reports an exit, with its exit code and signal."
+  "Return whether STATUS reports an exit, with the exit code and signal."
   (if (json-object-p status)
       (let ((code   (json-get status "exitCode"))
             (signal (json-get status "signal")))
@@ -823,7 +823,7 @@ ENVIRONMENT is a list of (NAME . VALUE) strings."
     (acp-agent string string)
     (values string boolean boolean (or null integer) (or null string)))
 (defun agent-terminal-output (agent session-id terminal-id)
-  "Return TERMINAL-ID's output so far, whether it was truncated, and its exit state.
+  "Return TERMINAL-ID's output so far, whether it was truncated, and the exit state.
 
 The exit state is three values: whether the command exited, its exit code,
 and the terminating signal."
@@ -848,7 +848,7 @@ and the terminating signal."
     (acp-agent string string &key (:timeout (or null real)))
     (values (or null integer) (or null string)))
 (defun agent-wait-for-terminal-exit (agent session-id terminal-id &key (timeout nil timeout-p))
-  "Wait for TERMINAL-ID's command to exit; return its exit code and signal."
+  "Wait for TERMINAL-ID's command to exit, then return the exit code and signal."
   (agent--require-client-capability agent "terminal")
   (let* ((params (json-object "sessionId" session-id "terminalId" terminal-id))
          (result (if timeout-p
@@ -863,7 +863,7 @@ and the terminating signal."
 
 (-> agent-kill-terminal (acp-agent string string) null)
 (defun agent-kill-terminal (agent session-id terminal-id)
-  "Kill TERMINAL-ID's command while keeping the terminal readable."
+  "Kill TERMINAL-ID's command, but keep the terminal readable."
   (agent--require-client-capability agent "terminal")
   (agent-client-request agent (acp-method-name ':terminal-kill)
                         (json-object "sessionId" session-id "terminalId" terminal-id))
@@ -871,7 +871,7 @@ and the terminating signal."
 
 (-> agent-release-terminal (acp-agent string string) null)
 (defun agent-release-terminal (agent session-id terminal-id)
-  "Release TERMINAL-ID, killing its command when still running."
+  "Release TERMINAL-ID, killing its command if there is any running."
   (agent--require-client-capability agent "terminal")
   (agent-client-request agent (acp-method-name ':terminal-release)
                         (json-object "sessionId" session-id "terminalId" terminal-id))
