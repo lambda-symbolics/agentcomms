@@ -341,9 +341,12 @@ Return a second value with the next page cursor when more sessions exist."))
       (setf (gethash session-id (acp-agent-sessions agent)) session))
     session))
 
-(-> agent--forget-session (acp-agent string) null)
-(defun agent--forget-session (agent session-id)
-  "Drop the record of SESSION-ID."
+(-> acp-agent-forget-session (acp-agent string) null)
+(defun acp-agent-forget-session (agent session-id)
+  "Remove SESSION-ID from AGENT's wire session table under the agent lock.
+
+This is bookkeeping only: it does not cancel prompts, close resources, or
+notify the client. Callers coordinate session lifetime and ID reuse."
   (with-lock-held ((acp-agent-lock agent))
     (remhash session-id (acp-agent-sessions agent)))
   nil)
@@ -520,7 +523,7 @@ Return a second value with the next page cursor when more sessions exist."))
                 (condition-wait (acp-agent-session-prompt-condition session)
                                 (acp-agent-lock agent) :timeout remaining))))
       (agent-close-session agent (acp-agent-session-identifier session) params)
-      (agent--forget-session agent (acp-agent-session-identifier session))))
+      (acp-agent-forget-session agent (acp-agent-session-identifier session))))
   nil)
 
 (defun agent--config-option-value (params)
@@ -630,7 +633,7 @@ Return a second value with the next page cursor when more sessions exist."))
          (agent--require-capability agent "sessionCapabilities.delete" method)
          (let ((session-id (acp-field params "sessionId" :type ':string :required-p t)))
            (agent-delete-session agent session-id params)
-           (agent--forget-session agent session-id)
+           (acp-agent-forget-session agent session-id)
            (json-object)))
         (:logout
          (agent--require-capability agent "auth.logout" method)

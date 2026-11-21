@@ -252,6 +252,7 @@
    #:acp-agent-serve
    #:acp-agent-session
    #:acp-agent-session-ids
+   #:acp-agent-forget-session
    #:acp-agent-session-identifier
    #:acp-agent-session-working-directory
    #:acp-agent-session-cancel-requested-p

@@ -242,6 +242,16 @@
                (test-assert (eq session (acp-agent-session agent "sess-1")))))
         (connection-close client))))
 
+(define-test agent-forget-session-only-deregisters
+  (let* ((agent (make-instance 'test-agent))
+         (other (agent--register-session agent "other" "/work")))
+    (agent--register-session agent "discard" "/work")
+    (acp-agent-forget-session agent "discard")
+    (acp-agent-forget-session agent "discard")
+    (test-assert (null (acp-agent-session agent "discard")))
+    (test-assert (eq other (acp-agent-session agent "other")))
+    (test-assert (null (test-agent-closed-sessions agent)))
+    (test-equal 0 (test-agent-cancellations agent))))
 
 ;;;; -- Reader Shutdown Boundaries --
 
